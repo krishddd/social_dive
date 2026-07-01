@@ -1,29 +1,109 @@
-# Social Dive
+# 🤿 Social Dive
 
-A from-scratch, improved successor to [Agent Reach](https://github.com/Panniantong/Agent-Reach) — an
-AI-agent internet-access capability layer (installer + doctor + config tool for 15+ platforms).
+[![CI](https://github.com/krishddd/social_dive/actions/workflows/ci.yml/badge.svg)](https://github.com/krishddd/social_dive/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/social-dive.svg)](https://badge.fury.io/py/social-dive)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Goals vs. the original
+**Social Dive** is an AI-agent internet-access capability layer for 20+ knowledge sources. 
+It acts as an installer, doctor, config tool, and execution layer that connects AI Agents (Claude Code, Cursor, Windsurf, etc.) with platforms like arXiv, GitHub, YouTube, Wikipedia, PubMed, Semantic Scholar, Hacker News, Stack Overflow, DEV.to, RSS feeds, Crossref DOIs, OpenAlex, Europe PMC, and the broader web.
 
-- **Hybrid Python + Rust**: orchestration/CLI/config in Python, performance/reliability-critical
-  parsing/networking/scraping in Rust (via PyO3/maturin or a standalone Rust binary).
-- **Pluggable LLM backend layer**: primary development backend is NVIDIA-hosted GLM-5.1 and
-  MiniMax (via an NVIDIA API key), but the interface must also be drop-in compatible with the
-  OpenAI API shape and the Anthropic API shape, so users can swap providers without touching
-  application code.
-- Keep the original's core insight: it's a glue/routing layer, not a wrapper — agents call
-  upstream tools directly after setup.
+Built with a hybrid **Python** and **Rust** architecture, Social Dive features high-performance HTML-to-Markdown parsing and concurrent HTTP fetching without locking the Python GIL.
 
-## Status
+## Features
 
-Research phase. See `docs/research/` for findings (organized by source type: web, arxiv, github,
-publications) and `docs/plans/` for the resulting architecture/build plan once research lands.
+- **Multi-Source Read & Search:** 16+ internet sources natively supported without complex scraping tools.
+- **LLM Integration:** Seamless integration with NVIDIA NIM (DeepSeek, GLM, MiniMax), OpenAI, and Anthropic.
+- **MCP Server Included:** Exposes capabilities to any MCP-compatible AI agent.
+- **Zero-Config Options:** Works out-of-the-box for most sources (no API keys required).
+- **High Performance:** Rust core for HTML parsing and concurrent fetching.
 
-## Constraints carried over from studying the original repo
+## Installation
 
-- Platform ToS risk is real for cookie/session-based scraping (Twitter, Reddit, Instagram, XHS) —
-  ban risk falls on the end user, not just the tool author.
-- Third-party CLI dependencies (twitter-cli, rdt-cli, bili-cli, OpenCLI) are external projects
-  outside our control — they can break, go unmaintained, or disappear.
-- This category of tool requires ongoing maintenance (upstream access methods change constantly),
-  not just an initial build.
+```bash
+pip install social-dive
+```
+
+*(Optional) Install with specific LLM provider support:*
+```bash
+pip install "social-dive[anthropic]"
+```
+
+## Quick Start
+
+Check system health and available channels:
+```bash
+social-dive doctor
+```
+
+Read content from any supported URL (returns clean Markdown):
+```bash
+social-dive read https://arxiv.org/abs/2401.12345
+```
+
+Summarize a web page using an LLM:
+```bash
+social-dive summarize https://en.wikipedia.org/wiki/Artificial_intelligence
+```
+
+Search across academic or code sources:
+```bash
+social-dive search "Transformer architecture" --channels=arxiv,semantic_scholar
+```
+
+## Configuration
+
+Configure your LLM provider and API keys securely:
+
+```bash
+# Set LLM provider (nvidia, openai, or anthropic)
+social-dive configure llm_provider nvidia
+
+# Set your API keys
+social-dive configure nvidia_api_key "nvapi-..."
+social-dive configure github_token "ghp_..."
+
+# View current configuration
+social-dive configure --list
+```
+
+Configuration is stored securely in `~/.social-dive/config.yaml` with strict file permissions (`0600`).
+
+## Model Context Protocol (MCP)
+
+Social Dive includes a built-in MCP server so your AI agent can call its tools directly. 
+Start the server using:
+
+```bash
+python -m social_dive.integrations.mcp_server
+```
+
+### MCP Tools Available:
+- `read_url`: Read and extract content from any URL.
+- `search_sources`: Search across academic, code, and web sources.
+- `check_health`: Report channel availability.
+- `summarize_url`: Summarize content using the configured LLM.
+- `list_channels`: List all available knowledge channels.
+
+## Supported Channels
+
+| Channel | Description | Tier |
+|---------|-------------|------|
+| `arxiv` | Academic preprints | Zero Config |
+| `github` | Repositories, issues, PRs | Needs Key |
+| `youtube` | Video transcripts | Zero Config |
+| `wikipedia` | Encyclopedia articles | Zero Config |
+| `semantic_scholar` | Academic papers | Needs Key (optional) |
+| `pubmed` | Biomedical literature | Needs Key |
+| `hacker_news` | Tech news + discussions | Zero Config |
+| `stack_overflow` | Programming Q&A | Needs Key (optional) |
+| `devto` | Developer articles | Zero Config |
+| `crossref` | DOI metadata | Zero Config |
+| `openalex` | Scholarly works | Needs Key |
+| `europe_pmc` | Open-access papers | Needs Key |
+| `rss` | RSS/Atom feeds | Zero Config |
+| `doi_resolver` | DOI → full text | Zero Config |
+| `web` | Catch-all web reader | Zero Config |
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
