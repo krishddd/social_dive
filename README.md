@@ -7,6 +7,8 @@
 **Social Dive** is an AI-agent internet-access capability layer for 20+ knowledge sources. 
 It acts as an installer, doctor, config tool, and execution layer that connects AI Agents (Claude Code, Cursor, Windsurf, etc.) with platforms like arXiv, GitHub, YouTube, Wikipedia, PubMed, Semantic Scholar, Hacker News, Stack Overflow, DEV.to, RSS feeds, Crossref DOIs, OpenAlex, Europe PMC, and the broader web.
 
+> 📖 **Want to know how it works under the hood?** Read the [Project Architecture Summary](SUMMARY.md).
+
 Built with a hybrid **Python** and **Rust** architecture, Social Dive features high-performance HTML-to-Markdown parsing and concurrent HTTP fetching without locking the Python GIL.
 
 ## Features
