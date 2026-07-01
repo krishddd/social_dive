@@ -83,6 +83,9 @@ class NvidiaProvider(LLMProvider):
                 "thinking": True,
                 "reasoning_effort": kwargs.pop("reasoning_effort", "high"),
             }
+        elif "mistral" in model.lower() and "reasoning_effort" in kwargs:
+            extra_body["reasoning_effort"] = kwargs.pop("reasoning_effort")
+            
         if "minimax" in model.lower() and kwargs.pop("reasoning_split", False):
             extra_body["reasoning_split"] = True
 
