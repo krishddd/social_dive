@@ -18,8 +18,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import subprocess
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -27,6 +30,7 @@ from rich.console import Console
 
 from social_dive import __version__
 from social_dive.config import Config
+from social_dive.probe import probe_python_import
 
 if TYPE_CHECKING:
     from social_dive.channels import Content
@@ -96,6 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- uninstall ---
     uninst = sub.add_parser("uninstall", help="Remove Social Dive data")
     uninst.add_argument("--keep-config", action="store_true", help="Keep config file")
+    uninst.add_argument("--dry-run", action="store_true", help="Preview only")
 
     # -- skill ---
     skill = sub.add_parser("skill", help="Manage agent skill files")
@@ -243,17 +248,182 @@ def _cmd_summarize(args: argparse.Namespace) -> None:
     console.print(f"\n## Summary of: {content.title or args.url}\n\n{summary}")
 
 
+# ---------------------------------------------------------------------------
+# install / uninstall / skill
+# ---------------------------------------------------------------------------
+
+# Fixed, pinned allow-list: channel -> (import_name, pip_package). ONLY these
+# package names are ever passed to `pip install` — never anything derived from
+# user or network input — so the installer can't become an injection surface.
+# Channels not listed here need no extra dependency (they use the httpx core).
+_CHANNEL_PIP_DEPS: dict[str, tuple[str, str]] = {
+    "arxiv": ("arxiv", "arxiv"),
+    "rss": ("feedparser", "feedparser"),
+    "youtube": ("youtube_transcript_api", "youtube-transcript-api"),
+    "pubmed": ("Bio", "biopython"),
+}
+
+
+def _skill_source() -> Path:
+    """Path to the packaged SKILL.md."""
+    return Path(__file__).resolve().parent / "skill" / "SKILL.md"
+
+
+def _skill_dir_candidates() -> list[Path]:
+    """Agent skill directories to install into, in priority order.
+
+    Factored out so tests can monkeypatch it to a temp location.
+    """
+    home = Path.home()
+    return [home / ".claude" / "skills", home / ".agents" / "skills"]
+
+
+def _install_skill(dry_run: bool = False) -> list[Path]:
+    """Copy SKILL.md into each agent home that exists. Returns targets touched."""
+    src = _skill_source()
+    installed: list[Path] = []
+    for base in _skill_dir_candidates():
+        # Only install where the agent home (base.parent, e.g. ~/.claude) exists.
+        if not base.parent.exists():
+            continue
+        target = base / "social-dive"
+        if dry_run:
+            console.print(f"  [dim][dry-run] would install skill -> {target}[/dim]")
+            installed.append(target)
+            continue
+        # Windows-safe replace: rmtree can raise on junctions / locked files or
+        # where symlink semantics differ — treat "can't remove" as "preserve".
+        if target.exists():
+            try:
+                shutil.rmtree(target)
+            except OSError as e:
+                console.print(f"  [yellow]Could not replace {target}: {e}; preserving[/yellow]")
+                continue
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, target / "SKILL.md")
+            installed.append(target)
+            console.print(f"  [green]Installed skill -> {target}[/green]")
+        except OSError as e:
+            console.print(f"  [yellow]Could not install skill to {target}: {e}[/yellow]")
+    if not installed and not dry_run:
+        console.print(
+            "  [dim]No agent home (~/.claude, ~/.agents) found — skill not installed.[/dim]"
+        )
+    return installed
+
+
+def _uninstall_skill(dry_run: bool = False) -> list[Path]:
+    """Remove the social-dive skill from every agent home. Returns targets touched."""
+    removed: list[Path] = []
+    for base in _skill_dir_candidates():
+        target = base / "social-dive"
+        if not target.exists():
+            continue
+        if dry_run:
+            console.print(f"  [dim][dry-run] would remove {target}[/dim]")
+            removed.append(target)
+            continue
+        try:
+            shutil.rmtree(target)
+            removed.append(target)
+            console.print(f"  [green]Removed skill from {target}[/green]")
+        except OSError as e:
+            console.print(f"  [yellow]Could not remove {target}: {e}[/yellow]")
+    return removed
+
+
+def _pip_install(pkg: str) -> None:
+    """Run `pip install <pkg>` for a package from the fixed allow-list only."""
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", pkg], check=True)
+    except (subprocess.CalledProcessError, OSError) as e:
+        console.print(f"  [yellow]pip install {pkg} failed: {e}[/yellow]")
+
+
+def _missing_channel_deps(channels: list[str] | None) -> list[tuple[str, str]]:
+    """Return (channel, pip_package) for each requested channel whose dep is absent."""
+    targets = channels if channels else list(_CHANNEL_PIP_DEPS.keys())
+    missing: list[tuple[str, str]] = []
+    for channel in targets:
+        dep = _CHANNEL_PIP_DEPS.get(channel)
+        if dep is None:
+            continue
+        import_name, pip_pkg = dep
+        if not probe_python_import(pip_pkg, import_name).ok:
+            missing.append((channel, pip_pkg))
+    return missing
+
+
 def _cmd_install(args: argparse.Namespace) -> None:
-    console.print("[yellow]Install command is not yet implemented in this version.[/yellow]")
-    console.print("Run 'social-dive doctor' to see which channels are available.")
+    dry_run: bool = args.dry_run
+    safe: bool = args.safe
+    channels = args.channels.split(",") if args.channels else None
+
+    missing = _missing_channel_deps(channels)
+    if not missing:
+        console.print("[green]All requested channel dependencies are already installed.[/green]")
+    else:
+        pkgs = sorted({pip_pkg for _, pip_pkg in missing})
+        if dry_run:
+            console.print(f"[dry-run] Would install: {', '.join(pkgs)}")
+        elif safe:
+            console.print("Missing channel dependencies. Install them with:")
+            console.print(f"  {sys.executable} -m pip install {' '.join(pkgs)}")
+        else:
+            for pkg in pkgs:
+                console.print(f"  Installing {pkg} ...")
+                _pip_install(pkg)
+
+    # Config skeleton + skill registration only mutate in normal mode.
+    if dry_run:
+        console.print(f"[dry-run] Would ensure config at {Config().config_file}")
+        _install_skill(dry_run=True)
+        console.print("Dry run complete. No changes were made.")
+    elif safe:
+        console.print("Then create your config and register the skill:")
+        console.print("  social-dive configure <key> <value>")
+        console.print("  social-dive skill --install")
+    else:
+        _ensure_config_skeleton()
+        _install_skill()
+
+
+def _ensure_config_skeleton() -> None:
+    cfg = Config()
+    if cfg.config_file.exists():
+        console.print(f"[dim]Config already exists at {cfg.config_file}[/dim]")
+        return
+    # Persisting the default provider creates the 0600 config file.
+    cfg.set("llm_provider", cfg.get("llm_provider", "nvidia"))
+    console.print(f"  [green]Created config at {cfg.config_file}[/green]")
 
 
 def _cmd_uninstall(args: argparse.Namespace) -> None:
-    console.print("[yellow]Uninstall command is not yet implemented in this version.[/yellow]")
+    dry_run: bool = args.dry_run
+    _uninstall_skill(dry_run=dry_run)
+
+    cfg = Config()
+    if args.keep_config:
+        console.print(f"[dim]Keeping config at {cfg.config_dir}[/dim]")
+    elif dry_run:
+        console.print(f"[dry-run] Would remove config directory {cfg.config_dir}")
+    elif cfg.config_dir.exists():
+        try:
+            shutil.rmtree(cfg.config_dir)
+            console.print(f"  [green]Removed {cfg.config_dir}[/green]")
+        except OSError as e:
+            console.print(f"  [yellow]Could not remove {cfg.config_dir}: {e}[/yellow]")
+
+    if dry_run:
+        console.print("Dry run complete. No changes were made.")
 
 
 def _cmd_skill(args: argparse.Namespace) -> None:
-    console.print("[yellow]Skill management is not yet implemented in this version.[/yellow]")
+    if args.install:
+        _install_skill()
+    else:  # --uninstall (mutually exclusive group, required)
+        _uninstall_skill()
 
 
 # ---------------------------------------------------------------------------

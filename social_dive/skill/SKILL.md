@@ -1,10 +1,17 @@
 ---
 name: social-dive
 description: >
-  Read and search 16+ internet knowledge sources (arXiv, GitHub, PubMed,
+  Read and search 15+ research/dev/web sources (arXiv, GitHub, PubMed,
   Semantic Scholar, YouTube, Wikipedia, Hacker News, Stack Overflow, DEV.to,
   RSS feeds, Crossref, OpenAlex, Europe PMC, DOI resolver, and any web page).
-  Includes LLM-powered summarization via NVIDIA NIM, OpenAI, or Anthropic.
+  USE THIS whenever the user wants to research a topic, read a paper / repo /
+  article / video transcript, resolve a DOI, or search academic and developer
+  sources. Every result carries a verbatim source URL for citation. Includes
+  LLM-powered summarization via NVIDIA NIM, OpenAI, or Anthropic.
+triggers:
+  research: research, look up, find papers on, what does the literature say, survey
+  read: read this, summarize this url, open this paper/repo/article/video
+  search: search arxiv/github/stackoverflow/wikipedia for, find the repo/paper for
 ---
 
 # Social Dive Skill
@@ -20,33 +27,42 @@ Use Social Dive when the user asks you to:
 
 ## How to use
 
-### Step 1: Check available channels
+### Step 1: Check available channels (always first)
 
 ```bash
 social-dive doctor --json
 ```
 
-This returns a JSON report showing which channels are working. Use this to
-decide which channels to search.
+Returns each channel's `status` (ok/warn/off/error), its `active_backend`, and a
+`message`. Prefer `ok` channels; a `warn` channel usually still works but is
+degraded (e.g. missing API key). Backends change availability, so check first.
 
-### Step 2: Read a specific URL
+### Step 2: Read one or more URLs
 
 ```bash
-social-dive read <url>
 social-dive read <url> --format=json
+social-dive read <url1> <url2> <url3>          # fetched concurrently
 social-dive read <url> --summarize
 ```
 
-Supports URLs from: arXiv, GitHub, YouTube, Wikipedia, PubMed, Semantic Scholar,
-Hacker News, Stack Overflow, DEV.to, RSS feeds, DOI links, and any web page.
+- A single URL is dispatched to the best channel for it and returns one JSON
+  object; multiple URLs return a JSON array (fetched in parallel).
+- Results include `url`, `title`, `backend`, and `fetched_at`. On failure you get
+  a structured `error_code` (`rate_limited`, `unauthenticated`, `restricted`,
+  `timeout`, `not_found`, `error`) instead of a crash — check it before using.
 
 ### Step 3: Search across sources
 
 ```bash
-social-dive search "transformer architecture" --channels=arxiv,semantic_scholar --limit=10
+social-dive search "transformer architecture" --channels=arxiv,semantic_scholar --limit=10 --format=json
 social-dive search "Python async patterns" --channels=github,stack_overflow,devto
 social-dive search "CRISPR gene therapy" --channels=pubmed,openalex,europe_pmc
 ```
+
+The JSON response has `results` (each with a verbatim URL) and `skipped` — a map
+of channel → why it returned nothing (`not_supported`, `rate_limited`, …). If
+`results` is empty but you expected hits, `skipped` tells you whether
+reformulating the query is worth it.
 
 ### Step 4: Summarize content
 
@@ -54,6 +70,11 @@ social-dive search "CRISPR gene therapy" --channels=pubmed,openalex,europe_pmc
 social-dive summarize <url>
 social-dive summarize <url> --prompt="Focus on the methodology"
 ```
+
+## Citations
+
+Never invent URLs. Every `url` field is returned verbatim from the upstream
+API — cite those exactly.
 
 ## Channel Reference
 
