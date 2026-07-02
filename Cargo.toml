@@ -1,6 +1,6 @@
 [package]
 name = "social-dive-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Rust performance core for Social Dive — HTML→Markdown parser and concurrent HTTP fetcher"
 license = "MIT"

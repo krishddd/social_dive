@@ -45,7 +45,7 @@ class RSSChannel(Channel):
         """Parse an RSS/Atom feed and return its entries as structured content."""
         import feedparser
 
-        feed = feedparser.parse(url, agent="SocialDive/0.1.0")
+        feed = feedparser.parse(url, agent="SocialDive/0.2.0")
 
         if feed.bozo and not feed.entries:
             raise ValueError(f"Failed to parse feed at {url}: {feed.bozo_exception}")

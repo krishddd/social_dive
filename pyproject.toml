@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "social-dive"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-agent internet-access capability layer for 20+ knowledge sources — installer, doctor, config tool with pluggable LLM backends."
 readme = "README.md"
 license = {text = "MIT"}

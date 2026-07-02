@@ -146,7 +146,7 @@ class GitHubChannel(Channel):
     def _make_headers(self, token: str) -> dict[str, str]:
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "SocialDive/0.1.0",
+            "User-Agent": "SocialDive/0.2.0",
         }
         if token:
             headers["Authorization"] = f"token {token}"
