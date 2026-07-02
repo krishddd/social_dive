@@ -131,6 +131,63 @@ class SocialDive:
         content.fetched_at = datetime.utcnow().isoformat()
         return content
 
+    def read_many(self, urls: list[str]) -> list[Content]:
+        """Read several URLs, fetching web pages concurrently via the Rust core.
+
+        For a single URL (or when the Rust ``parallel_fetch`` extension isn't
+        available) this is just sequential :meth:`read`, so behavior is
+        identical to reading each URL on its own. For multiple URLs it uses the
+        Rust concurrent fetcher to grab the raw pages in parallel (GIL released)
+        and converts each to Markdown — a bulk web-read fast path, distinct from
+        the channel-aware single :meth:`read`.
+        """
+        if len(urls) <= 1:
+            return [self.read(u) for u in urls]
+
+        try:
+            from social_dive._core import parallel_fetch
+        except ImportError:
+            logger.debug("Rust _core unavailable; reading URLs sequentially")
+            return [self.read(u) for u in urls]
+
+        results = parallel_fetch(urls)
+        fetched_at = datetime.utcnow().isoformat()
+        contents = [self._content_from_fetch(r) for r in results]
+        for c in contents:
+            c.fetched_at = fetched_at
+        return contents
+
+    @staticmethod
+    def _content_from_fetch(result: Any) -> Content:
+        """Convert a Rust ``FetchResult`` into a Content (Markdown body)."""
+        if not getattr(result, "ok", False) or getattr(result, "status", 0) != 200:
+            return Content(
+                url=getattr(result, "url", ""),
+                source_channel="web",
+                body=f"[fetch failed: {getattr(result, 'error', '') or 'HTTP '}"
+                f"{getattr(result, 'status', 0)}]",
+                error_code="rate_limited" if getattr(result, "status", 0) == 429 else "error",
+                backend="parallel-fetch",
+            )
+        try:
+            from social_dive._core import html_to_markdown
+
+            body = html_to_markdown(result.body)
+        except Exception:  # noqa: BLE001 — fall back to the raw body
+            body = result.body
+        title = ""
+        for line in body.split("\n"):
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        return Content(
+            title=title,
+            body=body,
+            url=result.url,
+            source_channel="web",
+            backend="parallel-fetch",
+        )
+
     def search(
         self,
         query: str,
