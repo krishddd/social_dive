@@ -10,8 +10,6 @@ from __future__ import annotations
 import re
 from html import unescape
 
-import httpx
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,
@@ -22,6 +20,7 @@ from social_dive.channels import (
 )
 from social_dive.config import Config
 from social_dive.doctor import register_channel
+from social_dive.http_client import get_client
 from social_dive.probe import probe_url
 
 
@@ -55,7 +54,8 @@ class StackOverflowChannel(Channel):
         })
 
         # Get question
-        resp = httpx.get(
+        client = get_client(config)
+        resp = client.get(
             f"{self._API_BASE}/questions/{question_id}",
             params=params,
             timeout=15.0,
@@ -75,7 +75,7 @@ class StackOverflowChannel(Channel):
         tags = q.get("tags", [])
 
         # Get answers
-        answers_resp = httpx.get(
+        answers_resp = client.get(
             f"{self._API_BASE}/questions/{question_id}/answers",
             params={**params, "sort": "votes", "order": "desc"},
             timeout=15.0,
@@ -127,7 +127,7 @@ class StackOverflowChannel(Channel):
             "pagesize": limit,
         })
 
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/search/advanced",
             params=params,
             timeout=15.0,

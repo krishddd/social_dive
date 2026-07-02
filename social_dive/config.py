@@ -95,7 +95,10 @@ class Config:
 
     def set(self, key: str, value: Any) -> None:
         """Set a config value and persist to disk."""
-        if key not in CONFIG_KEYS:
+        # ``<channel>_backend`` keys are a dynamic, per-channel override family
+        # (see Channel.ordered_backends), so they're valid without being
+        # enumerated in CONFIG_KEYS.
+        if key not in CONFIG_KEYS and not key.endswith("_backend"):
             logger.warning(f"Setting unknown config key: {key}")
         self._data[key] = value
         self._save()

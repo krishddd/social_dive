@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import re
 
-import httpx
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,
@@ -21,6 +19,7 @@ from social_dive.channels import (
 )
 from social_dive.config import Config
 from social_dive.doctor import register_channel
+from social_dive.http_client import get_client
 from social_dive.probe import probe_url
 
 
@@ -46,7 +45,8 @@ class EuropePMCChannel(Channel):
         if not pmcid:
             raise ValueError(f"Could not extract PMC ID from: {url}")
 
-        resp = httpx.get(
+        client = get_client(config)
+        resp = client.get(
             f"{self._API_BASE}/search",
             params={
                 "query": f"(EXT_ID:{pmcid})",
@@ -68,7 +68,7 @@ class EuropePMCChannel(Channel):
         pmc_id = paper.get("pmcid", "")
         if pmc_id:
             try:
-                ft_resp = httpx.get(
+                ft_resp = client.get(
                     f"{self._API_BASE}/{pmc_id}/fullTextXML",
                     timeout=20.0,
                 )
@@ -105,7 +105,7 @@ class EuropePMCChannel(Channel):
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
         """Search Europe PMC."""
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/search",
             params={
                 "query": query,

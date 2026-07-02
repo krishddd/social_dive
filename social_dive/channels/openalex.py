@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import re
 
-import httpx
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,
@@ -21,6 +19,7 @@ from social_dive.channels import (
 )
 from social_dive.config import Config
 from social_dive.doctor import register_channel
+from social_dive.http_client import get_client
 from social_dive.probe import probe_url
 
 
@@ -46,7 +45,7 @@ class OpenAlexChannel(Channel):
             raise ValueError(f"Could not extract OpenAlex work ID from: {url}")
 
         params = self._make_params(config)
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/works/{work_id}",
             params=params,
             timeout=15.0,
@@ -105,7 +104,7 @@ class OpenAlexChannel(Channel):
         params["search"] = query
         params["per_page"] = limit
 
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/works",
             params=params,
             timeout=15.0,
@@ -146,21 +145,34 @@ class OpenAlexChannel(Channel):
 
     def check(self, config: Config) -> ChannelStatus:
         result = probe_url("openalex-api", f"{self._API_BASE}/works?search=test&per_page=1")
-        if result.ok:
-            has_key = bool(config.get("openalex_api_key"))
-            key_note = "(with key)" if has_key else "(no key, limited daily quota)"
+        if not result.ok:
+            return ChannelStatus(
+                channel=self.name,
+                level=StatusLevel.ERROR,
+                tier=self.tier,
+                message=f"OpenAlex API unreachable: {result.error}",
+            )
+        # OpenAlex retired its free "polite pool" (email-only access) in Feb
+        # 2026 in favour of API keys, so a missing key means degraded service,
+        # not a hard failure — surface it as a loud WARN, but calls still work.
+        has_key = bool(config.get("openalex_api_key"))
+        if has_key:
             return ChannelStatus(
                 channel=self.name,
                 level=StatusLevel.OK,
                 tier=self.tier,
-                active_backend="openalex-api",
-                message=f"OpenAlex API reachable {key_note}",
+                active_backend=self.backends[0],
+                message="OpenAlex API reachable (with key)",
             )
         return ChannelStatus(
             channel=self.name,
-            level=StatusLevel.ERROR,
+            level=StatusLevel.WARN,
             tier=self.tier,
-            message=f"OpenAlex API unreachable: {result.error}",
+            active_backend=self.backends[0],
+            message=(
+                "OpenAlex API reachable but no API key set — the free polite pool "
+                "was retired Feb 2026; set 'openalex_api_key' for reliable quota"
+            ),
         )
 
     def _make_params(self, config: Config) -> dict:

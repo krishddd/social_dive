@@ -10,8 +10,6 @@ from __future__ import annotations
 import re
 from urllib.parse import quote
 
-import httpx
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,
@@ -22,6 +20,7 @@ from social_dive.channels import (
 )
 from social_dive.config import Config
 from social_dive.doctor import register_channel
+from social_dive.http_client import get_client
 from social_dive.probe import probe_url
 
 
@@ -50,11 +49,10 @@ class CrossrefChannel(Channel):
         contact_email = config.get("openalex_email", "noreply@example.com")
         headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{contact_email})"}
 
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/works/{quote(doi, safe='/')}",
             headers=headers,
             timeout=15.0,
-            follow_redirects=True,
         )
         resp.raise_for_status()
         work = resp.json().get("message", {})
@@ -123,7 +121,7 @@ class CrossrefChannel(Channel):
         contact_email = config.get("openalex_email", "noreply@example.com")
         headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{contact_email})"}
 
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/works",
             params={"query": query, "rows": limit, "sort": "relevance"},
             headers=headers,
