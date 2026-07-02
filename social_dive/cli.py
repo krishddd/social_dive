@@ -19,14 +19,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 from loguru import logger
 from rich.console import Console
 
 from social_dive import __version__
 from social_dive.config import Config
-
 
 console = Console()
 
@@ -129,7 +128,9 @@ def _cmd_configure(args: argparse.Namespace) -> None:
         # List all config
         all_cfg = config.all()
         if not all_cfg:
-            console.print("[dim]No configuration set. Use 'social-dive configure <key> <value>'[/dim]")
+            console.print(
+                "[dim]No configuration set. Use 'social-dive configure <key> <value>'[/dim]"
+            )
             return
         for k, v in sorted(all_cfg.items()):
             # Mask sensitive values

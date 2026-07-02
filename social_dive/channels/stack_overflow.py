@@ -11,7 +11,6 @@ import re
 from html import unescape
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -89,7 +88,9 @@ class StackOverflowChannel(Channel):
             a_body = self._strip_html(a.get("body", ""))
             a_score = a.get("score", 0)
             accepted = " ✅" if a.get("is_accepted") else ""
-            answers_body += f"\n\n---\n### Answer by {a_author} (score: {a_score}){accepted}\n\n{a_body}"
+            answers_body += (
+                f"\n\n---\n### Answer by {a_author} (score: {a_score}){accepted}\n\n{a_body}"
+            )
 
         body = (
             f"# {q_title}\n\n"

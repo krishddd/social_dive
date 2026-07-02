@@ -4,11 +4,6 @@ CLI integration tests — version sync, help output, basic command execution.
 
 from __future__ import annotations
 
-import subprocess
-import sys
-
-import pytest
-
 from social_dive import __version__
 from social_dive.cli import main
 
@@ -22,8 +17,9 @@ class TestVersionSync:
 
     def test_version_matches_pyproject(self):
         """Version in __init__.py must match pyproject.toml."""
-        import tomllib
         from pathlib import Path
+
+        import tomllib
 
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         if pyproject.exists():
@@ -36,7 +32,6 @@ class TestCLI:
     def test_help_exits_cleanly(self, capsys):
         """Running with no args should print help and not crash."""
         main([])
-        captured = capsys.readouterr()
         # Help is printed to stdout or stderr depending on argparse
         # Just verify it doesn't crash
 
@@ -50,5 +45,4 @@ class TestCLI:
         import os
         os.environ["SOCIAL_DIVE_LLM_PROVIDER"] = "nvidia"
         main(["configure", "--list"])
-        captured = capsys.readouterr()
         # Should produce some output without crashing

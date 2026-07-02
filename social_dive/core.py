@@ -16,7 +16,7 @@ from loguru import logger
 
 from social_dive.channels import Channel, Content, SearchNotSupportedError, SearchResult
 from social_dive.config import Config
-from social_dive.doctor import DoctorReport, check_all, get_registered_channels, _discover_channels
+from social_dive.doctor import DoctorReport, _discover_channels, check_all, get_registered_channels
 from social_dive.llm.base import LLMProvider
 
 
@@ -254,7 +254,9 @@ class SocialDive:
                 if not key:
                     return None
                 from social_dive.llm.nvidia import NvidiaProvider
-                self._llm = NvidiaProvider(api_key=key, default_model=model or "deepseek-ai/deepseek-v4-flash")
+                self._llm = NvidiaProvider(
+                    api_key=key, default_model=model or "deepseek-ai/deepseek-v4-flash"
+                )
 
             elif provider_name == "openai":
                 key = self._config.get("openai_api_key")
@@ -268,7 +270,9 @@ class SocialDive:
                 if not key:
                     return None
                 from social_dive.llm.anthropic_provider import AnthropicProvider
-                self._llm = AnthropicProvider(api_key=key, default_model=model or "claude-sonnet-4-20250514")
+                self._llm = AnthropicProvider(
+                    api_key=key, default_model=model or "claude-sonnet-4-20250514"
+                )
 
             else:
                 logger.warning(f"Unknown LLM provider: {provider_name}")

@@ -170,5 +170,6 @@ class DOIResolverChannel(Channel):
         data = resp.json()
         best_oa = data.get("best_oa_location", {})
         if best_oa:
-            return best_oa.get("url_for_pdf") or best_oa.get("url")
+            oa_url: str | None = best_oa.get("url_for_pdf") or best_oa.get("url")
+            return oa_url
         return None

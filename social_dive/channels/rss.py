@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import re
 
-from loguru import logger
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,

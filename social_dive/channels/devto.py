@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,

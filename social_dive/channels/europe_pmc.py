@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -125,10 +124,13 @@ class EuropePMCChannel(Channel):
                 for a in paper.get("authorList", {}).get("author", [])[:5]
             ]
 
+            article_url = (
+                f"https://europepmc.org/article/{paper.get('source', 'MED')}/{paper.get('id', '')}"
+            )
             results.append(
                 SearchResult(
                     title=paper.get("title", ""),
-                    url=f"https://europepmc.org/article/{paper.get('source', 'MED')}/{paper.get('id', '')}",
+                    url=article_url,
                     snippet=(paper.get("abstractText", "") or "")[:300],
                     source_channel=self.name,
                     backend=self.backends[0],
@@ -146,7 +148,8 @@ class EuropePMCChannel(Channel):
         return results
 
     def check(self, config: Config) -> ChannelStatus:
-        result = probe_url("europepmc-api", f"{self._API_BASE}/search?query=test&format=json&pageSize=1")
+        probe_target = f"{self._API_BASE}/search?query=test&format=json&pageSize=1"
+        result = probe_url("europepmc-api", probe_target)
         if result.ok:
             return ChannelStatus(
                 channel=self.name,

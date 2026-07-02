@@ -20,7 +20,6 @@ from rich.table import Table
 from social_dive.channels import Channel, ChannelStatus, ChannelTier, StatusLevel
 from social_dive.config import Config
 
-
 # ---------------------------------------------------------------------------
 # Channel registry
 # ---------------------------------------------------------------------------
@@ -179,6 +178,6 @@ def print_report(report: DoctorReport) -> None:
     console.print(f"\n  Summary: {' · '.join(parts)}")
 
     if report.errors:
-        console.print(f"\n  [red]Errors during check:[/red]")
+        console.print("\n  [red]Errors during check:[/red]")
         for err in report.errors:
             console.print(f"    • {err}")

@@ -11,7 +11,6 @@ import re
 from urllib.parse import quote
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -124,7 +123,8 @@ class WikipediaChannel(Channel):
         return results
 
     def check(self, config: Config) -> ChannelStatus:
-        result = probe_url("rest-api", f"{self._API_BASE}/page/summary/Python_(programming_language)")
+        probe_target = f"{self._API_BASE}/page/summary/Python_(programming_language)"
+        result = probe_url("rest-api", probe_target)
         if result.ok:
             return ChannelStatus(
                 channel=self.name,

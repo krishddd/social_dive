@@ -117,10 +117,11 @@ class HackerNewsChannel(Channel):
 
         results: list[SearchResult] = []
         for hit in data.get("hits", []):
+            fallback_url = f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}"
             results.append(
                 SearchResult(
                     title=hit.get("title", ""),
-                    url=hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}",
+                    url=hit.get("url") or fallback_url,
                     snippet=hit.get("story_text", "")[:300] if hit.get("story_text") else "",
                     source_channel=self.name,
                     backend="algolia-api",
@@ -166,7 +167,8 @@ class HackerNewsChannel(Channel):
                 timeout=15.0,
             )
             resp.raise_for_status()
-            return resp.json().get("hits", [])
+            hits: list[dict] = resp.json().get("hits", [])
+            return hits
         except Exception as e:
             logger.debug(f"Failed to fetch HN comments: {e}")
             return []

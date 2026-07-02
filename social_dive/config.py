@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 import platform
 import stat
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -134,7 +133,7 @@ class Config:
         """Load config from YAML file if it exists."""
         if self._file.exists():
             try:
-                with open(self._file, "r", encoding="utf-8") as f:
+                with open(self._file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                     self._data = data if isinstance(data, dict) else {}
             except Exception as e:

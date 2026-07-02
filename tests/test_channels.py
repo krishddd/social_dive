@@ -4,8 +4,6 @@ Unit tests for individual channels — URL pattern matching and data parsing.
 
 from __future__ import annotations
 
-import pytest
-
 from social_dive.channels.arxiv import ArxivChannel
 from social_dive.channels.crossref import CrossrefChannel
 from social_dive.channels.devto import DevtoChannel
@@ -51,7 +49,8 @@ class TestYouTubeChannel:
         assert ch.can_handle("https://www.youtube.com/shorts/dQw4w9WgXcQ")
 
     def test_extract_video_id(self):
-        assert YouTubeChannel._extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+        watch_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        assert YouTubeChannel._extract_video_id(watch_url) == "dQw4w9WgXcQ"
         assert YouTubeChannel._extract_video_id("https://youtu.be/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
 
 
@@ -90,7 +89,8 @@ class TestHackerNewsChannel:
         assert ch.can_handle("https://news.ycombinator.com/item?id=12345")
 
     def test_extract_item_id(self):
-        assert HackerNewsChannel._extract_item_id("https://news.ycombinator.com/item?id=12345") == "12345"
+        item_url = "https://news.ycombinator.com/item?id=12345"
+        assert HackerNewsChannel._extract_item_id(item_url) == "12345"
 
 
 class TestWikipediaChannel:
@@ -109,7 +109,8 @@ class TestCrossrefChannel:
         assert ch.can_handle("https://doi.org/10.1038/nature12373")
 
     def test_extract_doi(self):
-        assert CrossrefChannel._extract_doi("https://doi.org/10.1038/nature12373") == "10.1038/nature12373"
+        doi_url = "https://doi.org/10.1038/nature12373"
+        assert CrossrefChannel._extract_doi(doi_url) == "10.1038/nature12373"
 
 
 class TestRSSChannel:

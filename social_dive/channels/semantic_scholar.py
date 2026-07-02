@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -32,7 +31,10 @@ class SemanticScholarChannel(Channel):
     backends = ["s2-api"]
 
     _API_BASE = "https://api.semanticscholar.org/graph/v1"
-    _FIELDS = "title,abstract,authors,year,citationCount,referenceCount,url,externalIds,publicationDate,venue"
+    _FIELDS = (
+        "title,abstract,authors,year,citationCount,referenceCount,url,externalIds,"
+        "publicationDate,venue"
+    )
 
     _URL_PATTERNS = [
         r"semanticscholar\.org/paper/",
@@ -142,12 +144,13 @@ class SemanticScholarChannel(Channel):
         result = probe_url("s2-api", f"{self._API_BASE}/paper/search?query=test&limit=1")
         if result.ok:
             has_key = bool(config.get("semantic_scholar_api_key"))
+            key_note = "(with API key)" if has_key else "(no key, lower rate limits)"
             return ChannelStatus(
                 channel=self.name,
                 level=StatusLevel.OK,
                 tier=self.tier,
                 active_backend="s2-api",
-                message=f"S2 API reachable {'(with API key)' if has_key else '(no key, lower rate limits)'}",
+                message=f"S2 API reachable {key_note}",
             )
         return ChannelStatus(
             channel=self.name,

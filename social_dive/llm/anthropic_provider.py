@@ -12,7 +12,6 @@ from loguru import logger
 
 from social_dive.llm.base import CompletionResult, LLMProvider
 
-
 ANTHROPIC_MODELS = [
     "claude-sonnet-4-20250514",
     "claude-opus-4-20250514",
