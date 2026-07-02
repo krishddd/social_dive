@@ -19,7 +19,10 @@ class TestVersionSync:
         """Version in __init__.py must match pyproject.toml."""
         from pathlib import Path
 
-        import tomllib
+        try:
+            import tomllib  # Python 3.11+
+        except ModuleNotFoundError:
+            import tomli as tomllib  # Python 3.10 backport — CI tests 3.10 too
 
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         if pyproject.exists():
