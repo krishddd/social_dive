@@ -8,9 +8,6 @@ Tier: zero-config (no API key needed).
 from __future__ import annotations
 
 import re
-from typing import Any
-
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -58,6 +55,8 @@ class ArxivChannel(Channel):
             raise ValueError(f"No paper found for arXiv ID: {arxiv_id}")
 
         paper = results[0]
+        published_str = paper.published.strftime("%Y-%m-%d") if paper.published else "Unknown"
+        updated_str = paper.updated.strftime("%Y-%m-%d") if paper.updated else "Unknown"
 
         return Content(
             title=paper.title,
@@ -66,10 +65,11 @@ class ArxivChannel(Channel):
             body=f"**Abstract:**\n\n{paper.summary}\n\n"
                  f"**Categories:** {', '.join(paper.categories)}\n\n"
                  f"**PDF:** {paper.pdf_url}\n\n"
-                 f"**Published:** {paper.published.strftime('%Y-%m-%d') if paper.published else 'Unknown'}\n\n"
-                 f"**Updated:** {paper.updated.strftime('%Y-%m-%d') if paper.updated else 'Unknown'}",
+                 f"**Published:** {published_str}\n\n"
+                 f"**Updated:** {updated_str}",
             url=paper.entry_id,
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=paper.published.isoformat() if paper.published else "",
             metadata={
                 "arxiv_id": arxiv_id,
@@ -94,12 +94,14 @@ class ArxivChannel(Channel):
 
         results: list[SearchResult] = []
         for paper in client.results(search):
+            snippet = paper.summary[:300] + "..." if len(paper.summary) > 300 else paper.summary
             results.append(
                 SearchResult(
                     title=paper.title,
                     url=paper.entry_id,
-                    snippet=paper.summary[:300] + "..." if len(paper.summary) > 300 else paper.summary,
+                    snippet=snippet,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=[str(a) for a in paper.authors],
                     published_date=paper.published.isoformat() if paper.published else "",
                     metadata={

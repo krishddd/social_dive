@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import re
 
-from loguru import logger
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,
@@ -90,6 +88,7 @@ class PubMedChannel(Channel):
             body=body,
             url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=pub_date,
             metadata={
                 "pmid": pmid,
@@ -131,6 +130,7 @@ class PubMedChannel(Channel):
                     url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
                     snippet=s.get("Title", ""),  # esummary doesn't return abstracts
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=list(authors)[:5],
                     published_date=s.get("PubDate", ""),
                     metadata={

@@ -10,7 +10,6 @@ Backends (ordered fallback):
 from __future__ import annotations
 
 import re
-from typing import Any
 
 import httpx
 from loguru import logger

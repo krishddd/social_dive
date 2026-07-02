@@ -17,6 +17,7 @@ from social_dive.channels import (
     ChannelStatus,
     ChannelTier,
     Content,
+    SearchNotSupportedError,
     SearchResult,
     StatusLevel,
 )
@@ -65,8 +66,11 @@ class YouTubeChannel(Channel):
         )
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
-        """YouTube search requires API key — not implemented in zero-config."""
-        return []
+        """YouTube search requires the paid Data API — not available zero-config."""
+        raise SearchNotSupportedError(
+            "YouTube search requires a YouTube Data API key, not configured; "
+            "use read() with a specific video URL instead"
+        )
 
     def check(self, config: Config) -> ChannelStatus:
         # Check primary backend
@@ -99,22 +103,28 @@ class YouTubeChannel(Channel):
         )
 
     def _read_transcript_api(self, video_id: str, url: str) -> Content:
-        """Use youtube-transcript-api for direct transcript extraction."""
+        """Use youtube-transcript-api for direct transcript extraction.
+
+        v1.0+ replaced the old ``get_transcript()`` classmethod with an
+        instance-based ``fetch()`` returning a ``FetchedTranscript`` of
+        ``FetchedTranscriptSnippet(text, start, duration)`` objects
+        (attribute access, not dict ``.get()``).
+        """
         from youtube_transcript_api import YouTubeTranscriptApi
 
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        fetched_transcript = YouTubeTranscriptApi().fetch(video_id)
 
         # Build body from transcript segments
         lines = []
-        for segment in transcript_list:
-            start = segment.get("start", 0)
-            text = segment.get("text", "")
+        for segment in fetched_transcript:
+            start = segment.start
+            text = segment.text
             minutes = int(start // 60)
             seconds = int(start % 60)
             lines.append(f"[{minutes:02d}:{seconds:02d}] {text}")
 
         # Also get plain text version
-        plain_text = " ".join(s.get("text", "") for s in transcript_list)
+        plain_text = " ".join(s.text for s in fetched_transcript)
 
         return Content(
             title=f"YouTube Video: {video_id}",
@@ -122,18 +132,18 @@ class YouTubeChannel(Channel):
             abstract=plain_text[:500] + "..." if len(plain_text) > 500 else plain_text,
             url=url,
             source_channel=self.name,
+            backend="youtube-transcript-api",
             metadata={
                 "video_id": video_id,
-                "segment_count": len(transcript_list),
-                "backend": "youtube-transcript-api",
+                "segment_count": len(lines),
             },
         )
 
     def _read_ytdlp(self, video_id: str, url: str) -> Content:
         """Use yt-dlp to download subtitles."""
+        import json as _json
         import subprocess
         import tempfile
-        import json as _json
 
         # First get video info
         info_result = subprocess.run(
@@ -149,7 +159,7 @@ class YouTubeChannel(Channel):
 
         # Download subtitles
         with tempfile.TemporaryDirectory() as tmpdir:
-            sub_result = subprocess.run(
+            subprocess.run(
                 [
                     "yt-dlp",
                     "--write-auto-sub", "--write-sub",
@@ -168,7 +178,7 @@ class YouTubeChannel(Channel):
             if not vtt_files:
                 raise RuntimeError("yt-dlp did not produce subtitle files")
 
-            with open(vtt_files[0], "r", encoding="utf-8") as f:
+            with open(vtt_files[0], encoding="utf-8") as f:
                 vtt_content = f.read()
 
         # Parse VTT to plain text
@@ -191,11 +201,11 @@ class YouTubeChannel(Channel):
             url=url,
             source_channel=self.name,
             published_date=info.get("upload_date", ""),
+            backend="yt-dlp",
             metadata={
                 "video_id": video_id,
                 "duration": info.get("duration"),
                 "view_count": info.get("view_count"),
-                "backend": "yt-dlp",
             },
         )
 

@@ -12,7 +12,6 @@ from loguru import logger
 
 from social_dive.llm.base import CompletionResult, LLMProvider
 
-
 OPENAI_MODELS = [
     "gpt-4o",
     "gpt-4o-mini",
@@ -55,6 +54,12 @@ class OpenAIProvider(LLMProvider):
             max_tokens=max_tokens,
             stream=False,
         )
+        # stream=False above should select the non-streaming overload, but the
+        # SDK's overload resolution doesn't always narrow it — assert defends
+        # against a Stream slipping through at runtime too, not just the type
+        # checker.
+        from openai import Stream
+        assert not isinstance(completion, Stream)
 
         choice = completion.choices[0]
         usage = {}

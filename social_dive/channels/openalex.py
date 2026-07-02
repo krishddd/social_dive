@@ -8,10 +8,8 @@ Tier: needs-key (free API key for daily budget).
 from __future__ import annotations
 
 import re
-from urllib.parse import quote
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -90,6 +88,7 @@ class OpenAlexChannel(Channel):
             body=body,
             url=work.get("id", url),
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=str(work.get("publication_date", "")),
             metadata={
                 "openalex_id": work.get("id", ""),
@@ -130,6 +129,7 @@ class OpenAlexChannel(Channel):
                     url=work.get("id", ""),
                     snippet=abstract[:300] + "..." if len(abstract) > 300 else abstract,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=authors,
                     published_date=str(work.get("publication_date", "")),
                     score=float(work.get("cited_by_count", 0)),
@@ -148,12 +148,13 @@ class OpenAlexChannel(Channel):
         result = probe_url("openalex-api", f"{self._API_BASE}/works?search=test&per_page=1")
         if result.ok:
             has_key = bool(config.get("openalex_api_key"))
+            key_note = "(with key)" if has_key else "(no key, limited daily quota)"
             return ChannelStatus(
                 channel=self.name,
                 level=StatusLevel.OK,
                 tier=self.tier,
                 active_backend="openalex-api",
-                message=f"OpenAlex API reachable {'(with key)' if has_key else '(no key, limited daily quota)'}",
+                message=f"OpenAlex API reachable {key_note}",
             )
         return ChannelStatus(
             channel=self.name,

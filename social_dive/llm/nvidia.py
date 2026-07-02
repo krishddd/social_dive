@@ -14,7 +14,6 @@ from loguru import logger
 
 from social_dive.llm.base import CompletionResult, LLMProvider
 
-
 # Default models available on NVIDIA NIM (non-exhaustive)
 NVIDIA_MODELS = [
     "deepseek-ai/deepseek-v4-flash",
@@ -85,7 +84,7 @@ class NvidiaProvider(LLMProvider):
             }
         elif "mistral" in model.lower() and "reasoning_effort" in kwargs:
             extra_body["reasoning_effort"] = kwargs.pop("reasoning_effort")
-            
+
         if "minimax" in model.lower() and kwargs.pop("reasoning_split", False):
             extra_body["reasoning_split"] = True
 
@@ -99,8 +98,14 @@ class NvidiaProvider(LLMProvider):
             max_tokens=max_tokens,
             top_p=kwargs.pop("top_p", 0.95),
             stream=False,
-            **({"extra_body": extra_body} if extra_body else {}),
+            extra_body=extra_body or None,
         )
+        # stream=False above should select the non-streaming overload, but the
+        # SDK's overload resolution doesn't narrow reliably through this call
+        # shape — assert defends against a Stream slipping through at runtime
+        # too, not just satisfying the type checker.
+        from openai import Stream
+        assert not isinstance(completion, Stream)
 
         choice = completion.choices[0]
         content = choice.message.content or ""

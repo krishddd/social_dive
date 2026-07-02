@@ -45,8 +45,10 @@ dev = [
     "pytest-cov>=5.0",
     "pytest-asyncio>=0.23",
     "mypy>=1.10",
+    "types-PyYAML>=6.0",
     "ruff>=0.5",
     "respx>=0.21",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 anthropic = [
     "anthropic>=0.30",
@@ -65,10 +67,26 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 
 [tool.mypy]
-python_version = "3.10"
+# No pinned python_version: CI already runs mypy separately under 3.10/3.11/
+# 3.12 (the full support matrix), so let each run target its own interpreter.
+# A pin here previously broke the 3.12 leg specifically — it forced mypy to
+# parse *third-party* stub files (numpy, pulled in transitively via openai's
+# optional numpy_proxy extra) under 3.10 syntax rules, and numpy's stubs use
+# Python 3.12-only PEP 695 `type` statements. This isn't about our own code's
+# compatibility (already checked per-matrix-leg); it's stub-parsing only.
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+# Third-party libs that ship no py.typed marker / stub package, and the
+# Rust extension (built by maturin, not present in a type-check-only env).
+[[tool.mypy.overrides]]
+module = [
+    "arxiv", "feedparser", "Bio", "Bio.*", "mcp", "mcp.*", "anthropic",
+    "social_dive._core",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.ruff]
 target-version = "py310"

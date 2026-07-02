@@ -11,7 +11,6 @@ import re
 from urllib.parse import quote
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -48,7 +47,8 @@ class CrossrefChannel(Channel):
         if not doi:
             raise ValueError(f"Could not extract DOI from: {url}")
 
-        headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{config.get('openalex_email', 'noreply@example.com')})"}
+        contact_email = config.get("openalex_email", "noreply@example.com")
+        headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{contact_email})"}
 
         resp = httpx.get(
             f"{self._API_BASE}/works/{quote(doi, safe='/')}",
@@ -105,6 +105,7 @@ class CrossrefChannel(Channel):
             body="\n".join(body_parts),
             url=f"https://doi.org/{doi}",
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=pub_date,
             metadata={
                 "doi": doi,
@@ -119,7 +120,8 @@ class CrossrefChannel(Channel):
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
         """Search Crossref for works matching the query."""
-        headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{config.get('openalex_email', 'noreply@example.com')})"}
+        contact_email = config.get("openalex_email", "noreply@example.com")
+        headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{contact_email})"}
 
         resp = httpx.get(
             f"{self._API_BASE}/works",
@@ -151,6 +153,7 @@ class CrossrefChannel(Channel):
                     url=f"https://doi.org/{doi}" if doi else "",
                     snippet=abstract,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=authors,
                     score=float(work.get("is-referenced-by-count", 0)),
                     metadata={

@@ -10,12 +10,9 @@ Tier: needs-key (GitHub token for higher rate limits).
 
 from __future__ import annotations
 
-import json as _json
 import re
-import subprocess
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -83,6 +80,7 @@ class GitHubChannel(Channel):
                     url=repo.get("html_url", ""),
                     snippet=repo.get("description", "") or "",
                     source_channel=self.name,
+                    backend="rest-api",
                     authors=[repo.get("owner", {}).get("login", "")],
                     score=float(repo.get("stargazers_count", 0)),
                     metadata={
@@ -180,6 +178,7 @@ class GitHubChannel(Channel):
                  f"---\n\n{readme_body}",
             url=url,
             source_channel=self.name,
+            backend="rest-api",
             metadata={
                 "stars": repo_data.get("stargazers_count", 0),
                 "forks": repo_data.get("forks_count", 0),
@@ -210,11 +209,12 @@ class GitHubChannel(Channel):
             )
             if comments_resp.status_code == 200:
                 for c in comments_resp.json():
-                    comments_body += f"\n\n---\n**{c.get('user', {}).get('login', 'unknown')}:**\n{c.get('body', '')}"
+                    author = c.get("user", {}).get("login", "unknown")
+                    comments_body += f"\n\n---\n**{author}:**\n{c.get('body', '')}"
         except Exception:
             pass
 
-        labels = [l.get("name", "") for l in issue.get("labels", [])]
+        labels = [label.get("name", "") for label in issue.get("labels", [])]
 
         return Content(
             title=issue.get("title", ""),
@@ -227,6 +227,7 @@ class GitHubChannel(Channel):
                  f"{comments_body}",
             url=url,
             source_channel=self.name,
+            backend="rest-api",
             published_date=issue.get("created_at", ""),
             metadata={
                 "state": issue.get("state", ""),

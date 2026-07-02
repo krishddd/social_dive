@@ -113,10 +113,7 @@ fn walk_node(node: &scraper::ElementRef, out: &mut String, state: &WalkState) {
                             out.push_str("\n\n---\n\n");
                         }
                         "a" => {
-                            let href = el.attr(&scraper::node::Qual {
-                                prefix: None,
-                                local: "href".into(),
-                            }).unwrap_or("#");
+                            let href = el.attr("href").unwrap_or("#");
                             out.push('[');
                             walk_node(&elem_ref, out, &next_state);
                             out.push_str("](");
@@ -124,14 +121,8 @@ fn walk_node(node: &scraper::ElementRef, out: &mut String, state: &WalkState) {
                             out.push(')');
                         }
                         "img" => {
-                            let src = el.attr(&scraper::node::Qual {
-                                prefix: None,
-                                local: "src".into(),
-                            }).unwrap_or("");
-                            let alt = el.attr(&scraper::node::Qual {
-                                prefix: None,
-                                local: "alt".into(),
-                            }).unwrap_or("image");
+                            let src = el.attr("src").unwrap_or("");
+                            let alt = el.attr("alt").unwrap_or("image");
                             out.push_str("![");
                             out.push_str(alt);
                             out.push_str("](");

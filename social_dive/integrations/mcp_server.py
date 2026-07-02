@@ -58,14 +58,15 @@ def search_sources(query: str, channels: str = "all", limit: int = 10) -> str:
         limit: Maximum results per channel (default 10).
 
     Returns:
-        JSON array of search results with title, URL, snippet, and metadata.
+        JSON object with a "results" array (title, URL, snippet, metadata)
+        and a "skipped" map of channel name -> reason for any channel that
+        contributed nothing (not supported / rate limited / errored) — use
+        this to decide whether reformulating the query is worth trying.
     """
     sd = _get_sd()
     channel_list = None if channels == "all" else channels.split(",")
-    results = sd.search(query, channels=channel_list, limit=limit)
-
-    from social_dive.formatters.json_fmt import format_search_results
-    return format_search_results(results)
+    response = sd.search(query, channels=channel_list, limit=limit)
+    return json.dumps(response.to_dict(), indent=2, ensure_ascii=False)
 
 
 @mcp.tool()

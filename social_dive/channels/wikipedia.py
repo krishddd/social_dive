@@ -11,7 +11,6 @@ import re
 from urllib.parse import quote
 
 import httpx
-from loguru import logger
 
 from social_dive.channels import (
     Channel,
@@ -80,6 +79,7 @@ class WikipediaChannel(Channel):
             body=body_text[:10000],  # Cap to avoid enormous articles
             url=summary_data.get("content_urls", {}).get("desktop", {}).get("page", url),
             source_channel=self.name,
+            backend=self.backends[0],
             metadata={
                 "pageid": summary_data.get("pageid"),
                 "description": summary_data.get("description", ""),
@@ -115,6 +115,7 @@ class WikipediaChannel(Channel):
                     url=f"https://en.wikipedia.org/wiki/{quote(title.replace(' ', '_'))}",
                     snippet=snippet,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     metadata={"pageid": item.get("pageid")},
                 )
             )
@@ -122,7 +123,8 @@ class WikipediaChannel(Channel):
         return results
 
     def check(self, config: Config) -> ChannelStatus:
-        result = probe_url("rest-api", f"{self._API_BASE}/page/summary/Python_(programming_language)")
+        probe_target = f"{self._API_BASE}/page/summary/Python_(programming_language)"
+        result = probe_url("rest-api", probe_target)
         if result.ok:
             return ChannelStatus(
                 channel=self.name,
