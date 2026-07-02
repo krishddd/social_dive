@@ -51,7 +51,7 @@ class WikipediaChannel(Channel):
         resp = httpx.get(
             f"{self._API_BASE}/page/summary/{quote(title)}",
             timeout=15.0,
-            headers={"User-Agent": "SocialDive/0.1.0"},
+            headers={"User-Agent": "SocialDive/0.2.0"},
             follow_redirects=True,
         )
         resp.raise_for_status()
@@ -62,7 +62,7 @@ class WikipediaChannel(Channel):
             html_resp = httpx.get(
                 f"{self._API_BASE}/page/mobile-html/{quote(title)}",
                 timeout=15.0,
-                headers={"User-Agent": "SocialDive/0.1.0"},
+                headers={"User-Agent": "SocialDive/0.2.0"},
                 follow_redirects=True,
             )
             html_resp.raise_for_status()
@@ -100,7 +100,7 @@ class WikipediaChannel(Channel):
                 "utf8": 1,
             },
             timeout=15.0,
-            headers={"User-Agent": "SocialDive/0.1.0"},
+            headers={"User-Agent": "SocialDive/0.2.0"},
         )
         resp.raise_for_status()
         data = resp.json()

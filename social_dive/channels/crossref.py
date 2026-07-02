@@ -47,7 +47,7 @@ class CrossrefChannel(Channel):
             raise ValueError(f"Could not extract DOI from: {url}")
 
         contact_email = config.get("openalex_email", "noreply@example.com")
-        headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{contact_email})"}
+        headers = {"User-Agent": f"SocialDive/0.2.0 (mailto:{contact_email})"}
 
         resp = get_client(config).get(
             f"{self._API_BASE}/works/{quote(doi, safe='/')}",
@@ -119,7 +119,7 @@ class CrossrefChannel(Channel):
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
         """Search Crossref for works matching the query."""
         contact_email = config.get("openalex_email", "noreply@example.com")
-        headers = {"User-Agent": f"SocialDive/0.1.0 (mailto:{contact_email})"}
+        headers = {"User-Agent": f"SocialDive/0.2.0 (mailto:{contact_email})"}
 
         resp = get_client(config).get(
             f"{self._API_BASE}/works",

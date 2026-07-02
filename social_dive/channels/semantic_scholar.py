@@ -160,7 +160,7 @@ class SemanticScholarChannel(Channel):
         )
 
     def _make_headers(self, config: Config) -> dict[str, str]:
-        headers = {"User-Agent": "SocialDive/0.1.0"}
+        headers = {"User-Agent": "SocialDive/0.2.0"}
         key = config.get("semantic_scholar_api_key")
         if key:
             headers["x-api-key"] = key

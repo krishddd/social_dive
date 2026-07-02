@@ -37,9 +37,11 @@ Check system health and available channels:
 social-dive doctor
 ```
 
-Read content from any supported URL (returns clean Markdown):
+Read content from any supported URL (returns clean Markdown). Pass several
+URLs to fetch them concurrently:
 ```bash
 social-dive read https://arxiv.org/abs/2401.12345
+social-dive read https://arxiv.org/abs/2401.12345 https://github.com/psf/requests
 ```
 
 Summarize a web page using an LLM:
@@ -47,9 +49,18 @@ Summarize a web page using an LLM:
 social-dive summarize https://en.wikipedia.org/wiki/Artificial_intelligence
 ```
 
-Search across academic or code sources:
+Search across academic or code sources. The JSON output includes a `skipped`
+map explaining why any channel returned nothing (e.g. `rate_limited`), so you
+can tell "found nothing" from "couldn't search":
 ```bash
-social-dive search "Transformer architecture" --channels=arxiv,semantic_scholar
+social-dive search "Transformer architecture" --channels=arxiv,semantic_scholar --format=json
+```
+
+Install optional per-channel dependencies and register the agent skill
+(`--dry-run` previews, `--safe` only prints instructions):
+```bash
+social-dive install --dry-run
+social-dive skill --install
 ```
 
 ## Configuration
@@ -64,11 +75,25 @@ social-dive configure llm_provider nvidia
 social-dive configure nvidia_api_key "nvapi-..."
 social-dive configure github_token "ghp_..."
 
+# OpenAlex retired its free "polite pool" in Feb 2026 — a key is now
+# recommended (without one the channel still works but is rate-limited).
+social-dive configure openalex_api_key "..."
+
 # View current configuration
 social-dive configure --list
 ```
 
 Configuration is stored securely in `~/.social-dive/config.yaml` with strict file permissions (`0600`).
+
+You can force a specific backend per channel with a `<channel>_backend` key
+(e.g. `web_backend`, `doi_resolver_backend`).
+
+### Responsible web access
+
+The `web` channel prefers a site's `/llms.txt` summary when present and
+respects Cloudflare's Content-Signal `ai-input` opt-out in `robots.txt`,
+declining to fetch content a site has marked off-limits to AI (override with
+`web_ignore_ai_signals true` if you have permission).
 
 ## Model Context Protocol (MCP)
 
@@ -81,10 +106,16 @@ python -m social_dive.integrations.mcp_server
 
 ### MCP Tools Available:
 - `read_url`: Read and extract content from any URL.
-- `search_sources`: Search across academic, code, and web sources.
+- `read_many`: Read multiple URLs concurrently, returning a JSON array.
+- `search`: Search across academic, code, and web sources. *(Renamed from
+  `search_sources` in 0.2.0; the old name remains as a deprecated alias for one
+  release — update your MCP client config.)*
 - `check_health`: Report channel availability.
 - `summarize_url`: Summarize content using the configured LLM.
 - `list_channels`: List all available knowledge channels.
+
+All tools are annotated `readOnlyHint` / `openWorldHint` so MCP hosts (Claude
+Code, Cursor, …) can auto-approve and parallelize them.
 
 ## Supported Channels
 
