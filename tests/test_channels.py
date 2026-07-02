@@ -4,16 +4,20 @@ Unit tests for individual channels — URL pattern matching and data parsing.
 
 from __future__ import annotations
 
+from social_dive.channels import StatusLevel
 from social_dive.channels.arxiv import ArxivChannel
 from social_dive.channels.crossref import CrossrefChannel
 from social_dive.channels.devto import DevtoChannel
 from social_dive.channels.github import GitHubChannel
 from social_dive.channels.hacker_news import HackerNewsChannel
+from social_dive.channels.openalex import OpenAlexChannel
 from social_dive.channels.rss import RSSChannel
 from social_dive.channels.stack_overflow import StackOverflowChannel
 from social_dive.channels.web import WebChannel
 from social_dive.channels.wikipedia import WikipediaChannel
 from social_dive.channels.youtube import YouTubeChannel
+from social_dive.config import Config
+from social_dive.probe import ProbeResult
 
 
 class TestArxivChannel:
@@ -135,3 +139,39 @@ class TestDevtoChannel:
     def test_can_handle(self):
         ch = DevtoChannel()
         assert ch.can_handle("https://dev.to/user/article-slug")
+
+
+class TestOpenAlexSoftRequiredKey:
+    """OpenAlex retired its free polite pool in Feb 2026 — a missing API key is
+    a loud WARN (degraded), not a hard failure."""
+
+    def _patch_reachable(self, monkeypatch):
+        monkeypatch.setattr(
+            "social_dive.channels.openalex.probe_url",
+            lambda *a, **k: ProbeResult(ok=True, backend="openalex-api", version="HTTP 200"),
+        )
+
+    def test_missing_key_is_warn_not_error(self, tmp_path, monkeypatch):
+        self._patch_reachable(monkeypatch)
+        cfg = Config(config_dir=tmp_path / ".sd")
+        status = OpenAlexChannel().check(cfg)
+        assert status.level == StatusLevel.WARN
+        assert status.active_backend == "openalex-api"
+        assert "openalex_api_key" in status.message
+
+    def test_present_key_is_ok(self, tmp_path, monkeypatch):
+        self._patch_reachable(monkeypatch)
+        cfg = Config(config_dir=tmp_path / ".sd")
+        cfg.set("openalex_api_key", "sk-test")
+        status = OpenAlexChannel().check(cfg)
+        assert status.level == StatusLevel.OK
+        assert status.active_backend == "openalex-api"
+
+    def test_unreachable_is_error(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "social_dive.channels.openalex.probe_url",
+            lambda *a, **k: ProbeResult(ok=False, backend="openalex-api", error="HTTP 503"),
+        )
+        cfg = Config(config_dir=tmp_path / ".sd")
+        status = OpenAlexChannel().check(cfg)
+        assert status.level == StatusLevel.ERROR

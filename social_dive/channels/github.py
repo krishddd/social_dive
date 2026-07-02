@@ -95,44 +95,51 @@ class GitHubChannel(Channel):
         return results
 
     def check(self, config: Config) -> ChannelStatus:
-        # Try gh CLI first
-        gh_result = probe_command("gh-cli", ["gh", "--version"])
-        if gh_result.ok:
-            # Check if authenticated
-            auth_result = probe_command("gh-cli", ["gh", "auth", "status"], timeout=5.0)
-            if auth_result.ok:
-                return ChannelStatus(
-                    channel=self.name,
-                    level=StatusLevel.OK,
-                    tier=self.tier,
-                    active_backend="gh-cli",
-                    message=f"gh CLI authenticated ({gh_result.version})",
-                )
+        # Probe each candidate in the (possibly user-overridden) order, then
+        # let the shared two-pass selector pick OK over WARN over the rest.
+        candidates: list[tuple[str, StatusLevel, str]] = []
+        for backend in self.ordered_backends(config):
+            probe = self._probe_backend(backend, config)
+            if probe is not None:
+                candidates.append((backend, probe[0], probe[1]))
+
+        chosen = self.select_backend(candidates)
+        if chosen is None:
             return ChannelStatus(
                 channel=self.name,
                 level=StatusLevel.WARN,
                 tier=self.tier,
-                active_backend="gh-cli",
-                message="gh CLI installed but not authenticated (run 'gh auth login')",
+                message="No GitHub token or gh CLI. Set 'github_token' or install gh CLI.",
             )
-
-        # Check REST API
-        token = config.get("github_token", "")
-        if token:
-            return ChannelStatus(
-                channel=self.name,
-                level=StatusLevel.OK,
-                tier=self.tier,
-                active_backend="rest-api",
-                message="GitHub REST API with token",
-            )
-
+        backend, level, message = chosen
         return ChannelStatus(
             channel=self.name,
-            level=StatusLevel.WARN,
+            level=level,
             tier=self.tier,
-            message="No GitHub token or gh CLI. Set 'github_token' or install gh CLI.",
+            active_backend=backend,
+            message=message,
         )
+
+    def _probe_backend(
+        self, backend: str, config: Config
+    ) -> tuple[StatusLevel, str] | None:
+        """Probe one backend. Returns None if it isn't available at all."""
+        if backend == "gh-cli":
+            gh_result = probe_command("gh-cli", ["gh", "--version"])
+            if not gh_result.ok:
+                return None
+            auth_result = probe_command("gh-cli", ["gh", "auth", "status"], timeout=5.0)
+            if auth_result.ok:
+                return StatusLevel.OK, f"gh CLI authenticated ({gh_result.version})"
+            return (
+                StatusLevel.WARN,
+                "gh CLI installed but not authenticated (run 'gh auth login')",
+            )
+        if backend == "rest-api":
+            if config.get("github_token", ""):
+                return StatusLevel.OK, "GitHub REST API with token"
+            return None  # no token → REST backend isn't usable, omit it
+        return None
 
     # -- Helpers --
 

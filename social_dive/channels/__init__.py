@@ -170,6 +170,47 @@ class Channel(ABC):
         """Probe this channel's backends and return a health-check status."""
         ...
 
+    def ordered_backends(self, config: Config | None = None) -> list[str]:
+        """Return this channel's backends in probe order, honoring an override.
+
+        The config key ``<name>_backend`` (env ``SOCIAL_DIVE_<NAME>_BACKEND``)
+        moves the named backend to the front of the list so users/agents can
+        force a specific backend when the default order picks a worse one.
+        Unknown override values are ignored — a stale override can never hide
+        an otherwise-working backend, only reprioritize a real one.
+        """
+        candidates = list(self.backends)
+        if config is None:
+            return candidates
+        override = config.get(f"{self.name}_backend")
+        if override:
+            for i, b in enumerate(candidates):
+                if b == override or b.startswith(override):
+                    candidates.insert(0, candidates.pop(i))
+                    break
+        return candidates
+
+    def select_backend(
+        self,
+        candidates: list[tuple[str, StatusLevel, str]],
+    ) -> tuple[str, StatusLevel, str] | None:
+        """Pick the best backend from probed candidates via two-pass selection.
+
+        ``candidates`` is a list of ``(backend, level, message)`` tuples (a
+        backend that isn't installed at all should simply be omitted, not
+        included with an OFF level). Returns the first fully-working (OK)
+        candidate; failing that, the first degraded-but-usable (WARN) one;
+        failing that, the first remaining candidate (e.g. ERROR); or ``None``
+        if the list is empty. This mirrors the ordered-fallback contract:
+        prefer a live backend, fall back to "installed but needs auth", and
+        only surface an error when nothing is usable.
+        """
+        for wanted in (StatusLevel.OK, StatusLevel.WARN):
+            for cand in candidates:
+                if cand[1] == wanted:
+                    return cand
+        return candidates[0] if candidates else None
+
     def _match_url(self, url: str, patterns: list[str]) -> bool:
         """Helper: check if a URL matches any of the given regex patterns."""
         for pattern in patterns:

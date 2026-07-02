@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import re
 
-import httpx
-
 from social_dive.channels import (
     Channel,
     ChannelStatus,
@@ -21,6 +19,7 @@ from social_dive.channels import (
 )
 from social_dive.config import Config
 from social_dive.doctor import register_channel
+from social_dive.http_client import get_client
 from social_dive.probe import probe_url
 
 
@@ -48,16 +47,16 @@ class DevtoChannel(Channel):
             raise ValueError(f"Could not extract DEV.to article path from: {url}")
 
         # Use the articles endpoint with a path lookup
-        resp = httpx.get(
+        client = get_client(config)
+        resp = client.get(
             f"{self._API_BASE}/articles/{path}",
             headers=self._HEADERS,
             timeout=15.0,
-            follow_redirects=True,
         )
 
         # If path lookup fails, try searching by URL
         if resp.status_code != 200:
-            resp = httpx.get(
+            resp = client.get(
                 f"{self._API_BASE}/articles",
                 params={"url": url},
                 headers=self._HEADERS,
@@ -90,7 +89,7 @@ class DevtoChannel(Channel):
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
         """Search DEV.to articles."""
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"{self._API_BASE}/articles",
             params={"tag": query, "per_page": limit, "top": 30},
             headers=self._HEADERS,

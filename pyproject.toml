@@ -37,6 +37,7 @@ dependencies = [
     "biopython>=1.83",
     "youtube-transcript-api>=0.6",
     "mcp[cli]>=1.0",
+    "diskcache>=5.6",
 ]
 
 [project.optional-dependencies]
@@ -83,7 +84,7 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
     "arxiv", "feedparser", "Bio", "Bio.*", "mcp", "mcp.*", "anthropic",
-    "social_dive._core",
+    "diskcache", "diskcache.*", "social_dive._core",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
