@@ -23,6 +23,7 @@ from social_dive.channels import (
     ChannelStatus,
     ChannelTier,
     Content,
+    SearchNotSupportedError,
     SearchResult,
     StatusLevel,
 )
@@ -65,6 +66,7 @@ class DOIResolverChannel(Channel):
                 web = WebChannel()
                 content = web.read(oa_url, config)
                 content.source_channel = self.name
+                content.backend = "unpaywall"
                 content.metadata["doi"] = doi
                 content.metadata["oa_source"] = "unpaywall"
                 return content
@@ -76,11 +78,15 @@ class DOIResolverChannel(Channel):
         crossref = CrossrefChannel()
         content = crossref.read(f"https://doi.org/{doi}", config)
         content.source_channel = self.name
+        content.backend = "crossref"
         return content
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
-        """DOI resolver doesn't support search — use Crossref or Semantic Scholar."""
-        return []
+        """DOI resolver takes a specific DOI, not a query — it has no search index."""
+        raise SearchNotSupportedError(
+            "DOI resolver has no search index; use the 'crossref' or "
+            "'semantic_scholar' channels to search, then resolve a DOI here"
+        )
 
     def check(self, config: Config) -> ChannelStatus:
         return ChannelStatus(
@@ -140,6 +146,7 @@ class DOIResolverChannel(Channel):
             body=body,
             url=f"https://doi.org/{doi}",
             source_channel=self.name,
+            backend="europepmc",
             published_date=paper.get("firstPublicationDate", ""),
             metadata={
                 "doi": doi,

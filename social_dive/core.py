@@ -7,14 +7,69 @@ LLM providers, and formatters into a single cohesive API.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
+import httpx
 from loguru import logger
 
-from social_dive.channels import Channel, Content, SearchResult
+from social_dive.channels import Channel, Content, SearchNotSupportedError, SearchResult
 from social_dive.config import Config
 from social_dive.doctor import DoctorReport, check_all, get_registered_channels, _discover_channels
 from social_dive.llm.base import LLMProvider
+
+
+def _classify_exception(e: Exception) -> str:
+    """Map an exception to a structured error code.
+
+    Allowed values: "rate_limited", "unauthenticated", "timeout",
+    "not_found", "error". Used so a channel failure degrades to a
+    structured ``Content.error_code``/skip-reason instead of an opaque
+    traceback reaching the caller.
+    """
+    if isinstance(e, httpx.HTTPStatusError):
+        status = e.response.status_code
+        if status == 429:
+            return "rate_limited"
+        if status in (401, 403):
+            return "unauthenticated"
+        return "error"
+    if isinstance(e, (httpx.TimeoutException, TimeoutError)):
+        return "timeout"
+    # Some channels wrap a third-party client (e.g. the `arxiv` package) that
+    # raises its own exception type for an HTTP error rather than httpx's —
+    # the status code is only visible in the message. This is a best-effort
+    # fallback, not a substitute for real header-based detection (that's
+    # Phase 2's http_client.py, see plan decision #3).
+    message = str(e)
+    if "429" in message:
+        return "rate_limited"
+    if " 401" in message or " 403" in message:
+        return "unauthenticated"
+    if isinstance(e, ValueError):
+        return "not_found"
+    return "error"
+
+
+@dataclass
+class SearchResponse:
+    """Aggregated multi-channel search results.
+
+    ``skipped`` maps channel name -> reason string for channels that
+    contributed no results (not supported / rate limited / errored),
+    distinguishing that from a channel that genuinely searched and found
+    nothing — the caller can use this to decide whether to reformulate the
+    query rather than treat every empty case identically.
+    """
+    results: list[SearchResult] = field(default_factory=list)
+    skipped: dict[str, str] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "results": [r.to_dict() for r in self.results],
+            "skipped": self.skipped,
+        }
 
 
 class SocialDive:
@@ -38,28 +93,50 @@ class SocialDive:
         """Read content from any supported URL.
 
         Dispatches to the first channel whose ``can_handle()`` returns True.
-        Falls back to the web channel if no specific channel matches.
+        Falls back to the web channel if no specific channel matches. A
+        channel that raises while reading degrades to a structured
+        ``Content`` with ``error_code`` set, rather than propagating —
+        matching the "a broken channel must never crash the caller" rule
+        already applied to the doctor report. Only the "no channel could
+        even attempt this URL" case still raises, since that's a genuine
+        usage error rather than a channel failure.
         """
         # Find matching channel
         for channel in self._channels:
             if channel.name != "web" and channel.can_handle(url):
-                logger.info(f"Reading {url} via {channel.name}")
-                return channel.read(url, self._config)
+                return self._dispatch_read(channel, url)
 
         # Fallback to web channel
         for channel in self._channels:
             if channel.name == "web" and channel.can_handle(url):
-                logger.info(f"Reading {url} via web (fallback)")
-                return channel.read(url, self._config)
+                return self._dispatch_read(channel, url)
 
         raise ValueError(f"No channel can handle URL: {url}")
+
+    def _dispatch_read(self, channel: Channel, url: str) -> Content:
+        logger.info(f"Reading {url} via {channel.name}")
+        try:
+            content = channel.read(url, self._config)
+        except Exception as e:
+            logger.warning(f"Read failed for {channel.name}: {e}")
+            content = Content(
+                url=url,
+                source_channel=channel.name,
+                body=f"[{channel.name} read failed: {e}]",
+                error_code=_classify_exception(e),
+            )
+        # Stamped centrally (not per-channel) so every result's timestamp
+        # reflects when the dispatcher actually received it, not whenever
+        # each channel happened to construct its Content internally.
+        content.fetched_at = datetime.utcnow().isoformat()
+        return content
 
     def search(
         self,
         query: str,
         channels: list[str] | None = None,
         limit: int = 10,
-    ) -> list[SearchResult]:
+    ) -> SearchResponse:
         """Search across channels and return aggregated results.
 
         Parameters
@@ -70,8 +147,16 @@ class SocialDive:
             List of channel names to search. If None, searches all channels.
         limit
             Max results per channel.
+
+        Returns
+        -------
+        SearchResponse
+            ``results`` from every channel that found something, plus
+            ``skipped`` explaining *why* any channel contributed nothing
+            (not supported / rate limited / errored) — see ``SearchResponse``.
         """
         all_results: list[SearchResult] = []
+        skipped: dict[str, str] = {}
 
         target_channels = self._channels
         if channels:
@@ -79,18 +164,24 @@ class SocialDive:
             if not target_channels:
                 raise ValueError(f"No matching channels for: {channels}")
 
+        fetched_at = datetime.utcnow().isoformat()
         for channel in target_channels:
             try:
                 results = channel.search(query, self._config, limit=limit)
+                for r in results:
+                    r.fetched_at = fetched_at
                 all_results.extend(results)
                 logger.debug(f"{channel.name}: {len(results)} results")
+            except SearchNotSupportedError as e:
+                skipped[channel.name] = f"not_supported: {e}"
             except Exception as e:
                 logger.warning(f"Search failed for {channel.name}: {e}")
+                skipped[channel.name] = f"{_classify_exception(e)}: {e}"
 
         # Sort by score (citation count, stars, etc.) descending
         all_results.sort(key=lambda r: r.score, reverse=True)
 
-        return all_results
+        return SearchResponse(results=all_results, skipped=skipped)
 
     def doctor(self) -> DoctorReport:
         """Run health checks on all channels."""

@@ -16,6 +16,7 @@ from social_dive.channels import (
     ChannelStatus,
     ChannelTier,
     Content,
+    SearchNotSupportedError,
     SearchResult,
     StatusLevel,
 )
@@ -79,6 +80,7 @@ class RSSChannel(Channel):
             body=f"# {feed_title}\n\n{feed_desc}\n\n" + "\n---\n\n".join(entries_text),
             url=url,
             source_channel=self.name,
+            backend=self.backends[0],
             metadata={
                 "feed_type": feed.version or "unknown",
                 "entry_count": len(feed.entries),
@@ -86,8 +88,10 @@ class RSSChannel(Channel):
         )
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
-        """RSS doesn't support search — return empty."""
-        return []
+        """RSS has no search index — a feed URL must be read directly."""
+        raise SearchNotSupportedError(
+            "RSS/Atom feeds have no search index; use read() with a specific feed URL"
+        )
 
     def check(self, config: Config) -> ChannelStatus:
         result = probe_python_import("feedparser", "feedparser")

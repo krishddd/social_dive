@@ -92,6 +92,7 @@ class EuropePMCChannel(Channel):
             body=body,
             url=f"https://europepmc.org/article/{paper.get('source', 'MED')}/{paper.get('id', '')}",
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=paper.get("firstPublicationDate", ""),
             metadata={
                 "pmcid": pmc_id,
@@ -130,6 +131,7 @@ class EuropePMCChannel(Channel):
                     url=f"https://europepmc.org/article/{paper.get('source', 'MED')}/{paper.get('id', '')}",
                     snippet=(paper.get("abstractText", "") or "")[:300],
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=authors,
                     published_date=paper.get("firstPublicationDate", ""),
                     score=float(paper.get("citedByCount", 0)),

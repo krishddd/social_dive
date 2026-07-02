@@ -93,6 +93,7 @@ class HackerNewsChannel(Channel):
             body="".join(body_parts),
             url=url,
             source_channel=self.name,
+            backend="firebase-api",
             metadata={
                 "item_id": item_id,
                 "score": score,
@@ -122,6 +123,7 @@ class HackerNewsChannel(Channel):
                     url=hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID', '')}",
                     snippet=hit.get("story_text", "")[:300] if hit.get("story_text") else "",
                     source_channel=self.name,
+                    backend="algolia-api",
                     authors=[hit.get("author", "")],
                     published_date=hit.get("created_at", ""),
                     score=float(hit.get("points", 0)),

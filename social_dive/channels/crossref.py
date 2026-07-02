@@ -105,6 +105,7 @@ class CrossrefChannel(Channel):
             body="\n".join(body_parts),
             url=f"https://doi.org/{doi}",
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=pub_date,
             metadata={
                 "doi": doi,
@@ -151,6 +152,7 @@ class CrossrefChannel(Channel):
                     url=f"https://doi.org/{doi}" if doi else "",
                     snippet=abstract,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=authors,
                     score=float(work.get("is-referenced-by-count", 0)),
                     metadata={

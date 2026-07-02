@@ -50,7 +50,15 @@ class ChannelStatus:
 
 @dataclass
 class Content:
-    """Structured content returned by a channel read()."""
+    """Structured content returned by a channel read().
+
+    ``backend`` records which of the channel's ``backends`` actually served
+    this result (e.g. "yt-dlp" vs "youtube-transcript-api"), and
+    ``error_code`` is set by the core dispatcher — never by the channel
+    itself — when ``read()`` raised, so a broken channel degrades to a
+    structured result instead of propagating an exception. Allowed values:
+    "rate_limited", "unauthenticated", "timeout", "not_found", "error".
+    """
     title: str = ""
     authors: list[str] = field(default_factory=list)
     abstract: str = ""
@@ -60,6 +68,8 @@ class Content:
     published_date: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
     fetched_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    backend: str = ""
+    error_code: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -72,12 +82,20 @@ class Content:
             "published_date": self.published_date,
             "metadata": self.metadata,
             "fetched_at": self.fetched_at,
+            "backend": self.backend,
+            "error_code": self.error_code,
         }
 
 
 @dataclass
 class SearchResult:
-    """A single search result from a channel."""
+    """A single search result from a channel.
+
+    ``backend`` records which of the channel's ``backends`` produced this
+    result. ``fetched_at`` is stamped centrally by the core dispatcher (not
+    per-channel) so every result in one search response shares a consistent
+    retrieval timestamp.
+    """
     title: str = ""
     url: str = ""
     snippet: str = ""
@@ -86,6 +104,8 @@ class SearchResult:
     published_date: str = ""
     score: float = 0.0
     metadata: dict[str, Any] = field(default_factory=dict)
+    backend: str = ""
+    fetched_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -97,7 +117,19 @@ class SearchResult:
             "published_date": self.published_date,
             "score": self.score,
             "metadata": self.metadata,
+            "backend": self.backend,
+            "fetched_at": self.fetched_at,
         }
+
+
+class SearchNotSupportedError(Exception):
+    """Raised by ``Channel.search()`` when a channel has no search capability.
+
+    Distinguishes "search not implemented for this source" from "searched
+    and found zero results" — per BrowseComp research (arXiv:2504.12516),
+    an agent needs this signal to know whether reformulating the query is
+    worth trying, rather than seeing an ambiguous empty list either way.
+    """
 
 
 # ---------------------------------------------------------------------------

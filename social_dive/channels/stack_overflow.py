@@ -104,6 +104,7 @@ class StackOverflowChannel(Channel):
             body=body,
             url=url,
             source_channel=self.name,
+            backend=self.backends[0],
             metadata={
                 "question_id": question_id,
                 "score": q_score,
@@ -140,6 +141,7 @@ class StackOverflowChannel(Channel):
                     url=q.get("link", ""),
                     snippet=", ".join(q.get("tags", [])),
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=[q.get("owner", {}).get("display_name", "")],
                     score=float(q.get("score", 0)),
                     metadata={

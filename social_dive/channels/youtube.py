@@ -17,6 +17,7 @@ from social_dive.channels import (
     ChannelStatus,
     ChannelTier,
     Content,
+    SearchNotSupportedError,
     SearchResult,
     StatusLevel,
 )
@@ -65,8 +66,11 @@ class YouTubeChannel(Channel):
         )
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
-        """YouTube search requires API key — not implemented in zero-config."""
-        return []
+        """YouTube search requires the paid Data API — not available zero-config."""
+        raise SearchNotSupportedError(
+            "YouTube search requires a YouTube Data API key, not configured; "
+            "use read() with a specific video URL instead"
+        )
 
     def check(self, config: Config) -> ChannelStatus:
         # Check primary backend
@@ -122,10 +126,10 @@ class YouTubeChannel(Channel):
             abstract=plain_text[:500] + "..." if len(plain_text) > 500 else plain_text,
             url=url,
             source_channel=self.name,
+            backend="youtube-transcript-api",
             metadata={
                 "video_id": video_id,
                 "segment_count": len(transcript_list),
-                "backend": "youtube-transcript-api",
             },
         )
 
@@ -191,11 +195,11 @@ class YouTubeChannel(Channel):
             url=url,
             source_channel=self.name,
             published_date=info.get("upload_date", ""),
+            backend="yt-dlp",
             metadata={
                 "video_id": video_id,
                 "duration": info.get("duration"),
                 "view_count": info.get("view_count"),
-                "backend": "yt-dlp",
             },
         )
 

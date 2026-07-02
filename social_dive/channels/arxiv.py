@@ -70,6 +70,7 @@ class ArxivChannel(Channel):
                  f"**Updated:** {paper.updated.strftime('%Y-%m-%d') if paper.updated else 'Unknown'}",
             url=paper.entry_id,
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=paper.published.isoformat() if paper.published else "",
             metadata={
                 "arxiv_id": arxiv_id,
@@ -100,6 +101,7 @@ class ArxivChannel(Channel):
                     url=paper.entry_id,
                     snippet=paper.summary[:300] + "..." if len(paper.summary) > 300 else paper.summary,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=[str(a) for a in paper.authors],
                     published_date=paper.published.isoformat() if paper.published else "",
                     metadata={

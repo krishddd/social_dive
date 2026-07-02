@@ -166,6 +166,11 @@ def _cmd_read(args: argparse.Namespace) -> None:
     sd = SocialDive()
     content = sd.read(args.url)
 
+    if content.error_code:
+        console.print(f"[red]Read failed ({content.error_code}): {content.body}[/red]")
+        if args.format != "json":
+            return
+
     if args.format == "json":
         print(json.dumps(content.to_dict(), indent=2, ensure_ascii=False))
     else:
@@ -189,19 +194,22 @@ def _cmd_search(args: argparse.Namespace) -> None:
 
     channels = args.channels.split(",") if args.channels else None
     sd = SocialDive()
-    results = sd.search(args.query, channels=channels, limit=args.limit)
+    response = sd.search(args.query, channels=channels, limit=args.limit)
 
     if args.format == "json":
-        print(json.dumps([r.to_dict() for r in results], indent=2, ensure_ascii=False))
+        print(json.dumps(response.to_dict(), indent=2, ensure_ascii=False))
     else:
-        if not results:
+        if not response.results:
             console.print("[dim]No results found.[/dim]")
-            return
-        for i, r in enumerate(results, 1):
+        for i, r in enumerate(response.results, 1):
             console.print(f"\n[bold]{i}. {r.title}[/bold]")
             console.print(f"   [dim]{r.source_channel}[/dim] · {r.url}")
             if r.snippet:
                 console.print(f"   {r.snippet[:200]}")
+        if response.skipped:
+            console.print("\n[dim]Skipped:[/dim]")
+            for channel_name, reason in response.skipped.items():
+                console.print(f"   [dim]{channel_name}: {reason}[/dim]")
 
 
 def _cmd_summarize(args: argparse.Namespace) -> None:

@@ -79,6 +79,7 @@ class DevtoChannel(Channel):
             body=article.get("body_markdown", article.get("body_html", "")),
             url=article.get("url", url),
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=article.get("published_at", ""),
             metadata={
                 "tags": article.get("tags", []),
@@ -106,6 +107,7 @@ class DevtoChannel(Channel):
                     url=article.get("url", ""),
                     snippet=article.get("description", ""),
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=[article.get("user", {}).get("name", "")],
                     published_date=article.get("published_at", ""),
                     score=float(article.get("positive_reactions_count", 0)),

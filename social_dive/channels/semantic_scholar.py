@@ -85,6 +85,7 @@ class SemanticScholarChannel(Channel):
             body=body,
             url=paper.get("url", url),
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=paper.get("publicationDate", ""),
             metadata={
                 "s2_id": paper.get("paperId", ""),
@@ -122,6 +123,7 @@ class SemanticScholarChannel(Channel):
                     url=paper.get("url", ""),
                     snippet=abstract[:300] + "..." if len(abstract) > 300 else abstract,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=authors,
                     published_date=paper.get("publicationDate", ""),
                     score=float(paper.get("citationCount", 0)),

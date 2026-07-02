@@ -90,6 +90,7 @@ class OpenAlexChannel(Channel):
             body=body,
             url=work.get("id", url),
             source_channel=self.name,
+            backend=self.backends[0],
             published_date=str(work.get("publication_date", "")),
             metadata={
                 "openalex_id": work.get("id", ""),
@@ -130,6 +131,7 @@ class OpenAlexChannel(Channel):
                     url=work.get("id", ""),
                     snippet=abstract[:300] + "..." if len(abstract) > 300 else abstract,
                     source_channel=self.name,
+                    backend=self.backends[0],
                     authors=authors,
                     published_date=str(work.get("publication_date", "")),
                     score=float(work.get("cited_by_count", 0)),
