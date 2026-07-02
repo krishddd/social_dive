@@ -74,7 +74,7 @@ disallow_untyped_defs = true
 # Third-party libs that ship no py.typed marker / stub package, and the
 # Rust extension (built by maturin, not present in a type-check-only env).
 [[tool.mypy.overrides]]
-module = ["arxiv", "feedparser", "Bio.*", "mcp.*", "social_dive._core"]
+module = ["arxiv", "feedparser", "Bio.*", "mcp.*", "anthropic", "social_dive._core"]
 ignore_missing_imports = true
 
 [tool.ruff]
