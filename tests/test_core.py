@@ -8,6 +8,10 @@ only SocialDive's dispatch logic in core.py, not any real backend.
 
 from __future__ import annotations
 
+import sys
+import types
+from dataclasses import dataclass
+
 import httpx
 import pytest
 
@@ -186,3 +190,66 @@ class TestSearchDispatch:
         response = sd.search("query")
         assert len(response.results) == 1
         assert list(response.skipped.keys()) == ["no_search_channel"]
+
+
+@dataclass
+class _FakeFetch:
+    url: str
+    status: int
+    body: str
+    error: str = ""
+    ok: bool = True
+
+
+def _install_fake_core(monkeypatch, results):
+    """Install a fake social_dive._core exposing parallel_fetch + html_to_markdown."""
+    mod = types.ModuleType("social_dive._core")
+    mod.parallel_fetch = lambda urls: results
+    mod.html_to_markdown = lambda html: f"# converted\n{html}"
+    monkeypatch.setitem(sys.modules, "social_dive._core", mod)
+
+
+class TestReadMany:
+    def test_single_url_uses_normal_read(self, sd):
+        # A one-URL read_many must behave exactly like a single read (dispatch),
+        # not touch parallel_fetch.
+        sd._channels = [_OkChannel()]
+        results = sd.read_many(["https://example.com/x"])
+        assert len(results) == 1
+        assert results[0].title == "fine"
+
+    def test_multiple_urls_use_parallel_fetch(self, sd, monkeypatch):
+        _install_fake_core(
+            monkeypatch,
+            [
+                _FakeFetch("https://a.com", 200, "<p>A</p>"),
+                _FakeFetch("https://b.com", 200, "<p>B</p>"),
+            ],
+        )
+        results = sd.read_many(["https://a.com", "https://b.com"])
+        assert [c.url for c in results] == ["https://a.com", "https://b.com"]
+        assert all(c.backend == "parallel-fetch" for c in results)
+        assert all(c.body.startswith("# converted") for c in results)
+        assert all(c.fetched_at for c in results)
+
+    def test_failed_fetch_becomes_structured_error(self, sd, monkeypatch):
+        _install_fake_core(
+            monkeypatch,
+            [
+                _FakeFetch("https://ok.com", 200, "<p>ok</p>"),
+                _FakeFetch("https://bad.com", 0, "", error="Request error", ok=False),
+                _FakeFetch("https://limited.com", 429, "", error="rate", ok=False),
+            ],
+        )
+        results = sd.read_many(["https://ok.com", "https://bad.com", "https://limited.com"])
+        assert results[0].error_code is None
+        assert results[1].error_code == "error"
+        assert results[2].error_code == "rate_limited"
+
+    def test_sequential_fallback_when_core_missing(self, sd, monkeypatch):
+        # Ensure the fake module is absent so the import raises ImportError.
+        monkeypatch.setitem(sys.modules, "social_dive._core", None)
+        sd._channels = [_OkChannel()]
+        results = sd.read_many(["https://a.com", "https://b.com"])
+        assert len(results) == 2
+        assert all(c.title == "fine" for c in results)  # went through normal read()

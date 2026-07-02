@@ -20,12 +20,17 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from rich.console import Console
 
 from social_dive import __version__
 from social_dive.config import Config
+
+if TYPE_CHECKING:
+    from social_dive.channels import Content
+    from social_dive.core import SocialDive
 
 console = Console()
 
@@ -59,8 +64,8 @@ def _build_parser() -> argparse.ArgumentParser:
     cfg.add_argument("--delete", action="store_true", help="Delete a config key")
 
     # -- read ---
-    read = sub.add_parser("read", help="Read content from a URL")
-    read.add_argument("url", help="URL to read")
+    read = sub.add_parser("read", help="Read content from one or more URLs")
+    read.add_argument("url", nargs="+", help="URL(s) to read (multiple fetched concurrently)")
     read.add_argument(
         "--format", choices=["markdown", "json"], default="markdown",
         help="Output format (default: markdown)",
@@ -165,8 +170,24 @@ def _cmd_read(args: argparse.Namespace) -> None:
     from social_dive.core import SocialDive
 
     sd = SocialDive()
-    content = sd.read(args.url)
 
+    # args.url is always a list (nargs="+"). A single URL keeps the exact
+    # original single-read output; multiple URLs fetch concurrently.
+    if len(args.url) == 1:
+        _render_read(sd, sd.read(args.url[0]), args)
+        return
+
+    contents = sd.read_many(args.url)
+    if args.format == "json":
+        print(json.dumps([c.to_dict() for c in contents], indent=2, ensure_ascii=False))
+        return
+    for i, content in enumerate(contents):
+        if i:
+            console.print("\n" + "─" * 60)
+        _render_read(sd, content, args)
+
+
+def _render_read(sd: SocialDive, content: Content, args: argparse.Namespace) -> None:
     if content.error_code:
         console.print(f"[red]Read failed ({content.error_code}): {content.body}[/red]")
         if args.format != "json":
