@@ -2,10 +2,13 @@
 DOI Resolver channel — resolve a DOI to full-text content via multi-source fallback.
 
 This channel chains through multiple sources to find the best full-text
-version of a paper given its DOI:
-  1. Crossref (metadata + abstract)
-  2. Europe PMC (open-access full text)
-  3. Unpaywall (OA link discovery)
+version of a paper given its DOI. The chain order is driven by
+``ordered_backends()`` (default: Europe PMC → Unpaywall → Crossref), so a user
+can force a preferred source with the ``doi_resolver_backend`` config key:
+
+  1. Europe PMC — open-access full text
+  2. Unpaywall  — OA link discovery (fetched via the web channel)
+  3. Crossref   — metadata + abstract (the guaranteed final fallback)
 
 Tier: zero-config.
 """
@@ -15,7 +18,6 @@ from __future__ import annotations
 import re
 from urllib.parse import quote
 
-import httpx
 from loguru import logger
 
 from social_dive.channels import (
@@ -29,13 +31,18 @@ from social_dive.channels import (
 )
 from social_dive.config import Config
 from social_dive.doctor import register_channel
+from social_dive.http_client import get_client
 
 
 @register_channel
 class DOIResolverChannel(Channel):
     name = "doi_resolver"
     tier = ChannelTier.ZERO_CONFIG
-    backends = ["crossref", "europepmc", "unpaywall"]
+    # Ordered by preference: full text first, metadata-only Crossref last as
+    # the guaranteed fallback. ordered_backends() lets a user reprioritize.
+    backends = ["europepmc", "unpaywall", "crossref"]
+
+    _EUROPEPMC_BASE = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
     _URL_PATTERNS = [
         r"^10\.\d{4,}/",  # Raw DOI string
@@ -46,40 +53,36 @@ class DOIResolverChannel(Channel):
         return bool(re.match(r"^10\.\d{4,}/", url))
 
     def read(self, url: str, config: Config) -> Content:
-        """Resolve a DOI to full-text content via multi-source fallback."""
+        """Resolve a DOI to content, trying each source in backend order.
+
+        Each source returns ``Content`` if it produced a usable result or
+        ``None`` to defer to the next; Crossref (metadata) never returns
+        ``None``, so as long as it's in the chain a result is guaranteed.
+        """
         doi = url.strip()
+        sources = {
+            "europepmc": self._try_europepmc,
+            "unpaywall": self._try_unpaywall,
+            "crossref": self._try_crossref,
+        }
 
-        # 1. Try Europe PMC for open-access full text
-        try:
-            content = self._read_europepmc(doi)
-            if content.body and len(content.body) > 200:
+        last_error: Exception | None = None
+        for backend in self.ordered_backends(config):
+            source = sources.get(backend)
+            if source is None:
+                continue
+            try:
+                content = source(doi, config)
+            except Exception as e:  # noqa: BLE001 — try the next source
+                logger.debug(f"DOI resolver: '{backend}' failed for {doi}: {e}")
+                last_error = e
+                continue
+            if content is not None:
                 return content
-        except Exception as e:
-            logger.debug(f"Europe PMC lookup failed for {doi}: {e}")
 
-        # 2. Try Unpaywall for OA links
-        try:
-            oa_url = self._find_oa_url(doi, config)
-            if oa_url:
-                # Delegate to web channel for the actual fetch
-                from social_dive.channels.web import WebChannel
-                web = WebChannel()
-                content = web.read(oa_url, config)
-                content.source_channel = self.name
-                content.backend = "unpaywall"
-                content.metadata["doi"] = doi
-                content.metadata["oa_source"] = "unpaywall"
-                return content
-        except Exception as e:
-            logger.debug(f"Unpaywall lookup failed for {doi}: {e}")
-
-        # 3. Fall back to Crossref metadata
-        from social_dive.channels.crossref import CrossrefChannel
-        crossref = CrossrefChannel()
-        content = crossref.read(f"https://doi.org/{doi}", config)
-        content.source_channel = self.name
-        content.backend = "crossref"
-        return content
+        if last_error is not None:
+            raise last_error
+        raise ValueError(f"Could not resolve DOI: {doi}")
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
         """DOI resolver takes a specific DOI, not a query — it has no search index."""
@@ -89,19 +92,51 @@ class DOIResolverChannel(Channel):
         )
 
     def check(self, config: Config) -> ChannelStatus:
+        order = " → ".join(self.ordered_backends(config))
         return ChannelStatus(
             channel=self.name,
             level=StatusLevel.OK,
             tier=self.tier,
             active_backend="multi-source",
-            message="DOI resolver (Crossref → Europe PMC → Unpaywall)",
+            message=f"DOI resolver ({order})",
         )
 
-    def _read_europepmc(self, doi: str) -> Content:
+    # -- per-source resolvers (return Content, or None to defer) -------------
+
+    def _try_europepmc(self, doi: str, config: Config) -> Content | None:
+        content = self._read_europepmc(doi, config)
+        # A thin abstract-only body isn't worth stopping the chain for.
+        if content.body and len(content.body) > 200:
+            return content
+        return None
+
+    def _try_unpaywall(self, doi: str, config: Config) -> Content | None:
+        oa_url = self._find_oa_url(doi, config)
+        if not oa_url:
+            return None
+        # Delegate to the web channel for the actual fetch.
+        from social_dive.channels.web import WebChannel
+
+        content = WebChannel().read(oa_url, config)
+        content.source_channel = self.name
+        content.backend = "unpaywall"
+        content.metadata["doi"] = doi
+        content.metadata["oa_source"] = "unpaywall"
+        return content
+
+    def _try_crossref(self, doi: str, config: Config) -> Content:
+        from social_dive.channels.crossref import CrossrefChannel
+
+        content = CrossrefChannel().read(f"https://doi.org/{doi}", config)
+        content.source_channel = self.name
+        content.backend = "crossref"
+        return content
+
+    def _read_europepmc(self, doi: str, config: Config) -> Content:
         """Try to get full text from Europe PMC."""
-        # Search for the paper by DOI
-        resp = httpx.get(
-            "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
+        client = get_client(config)
+        resp = client.get(
+            f"{self._EUROPEPMC_BASE}/search",
             params={
                 "query": f"DOI:{doi}",
                 "format": "json",
@@ -122,8 +157,8 @@ class DOIResolverChannel(Channel):
         if pmcid:
             # Try to get full text
             try:
-                ft_resp = httpx.get(
-                    f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML",
+                ft_resp = client.get(
+                    f"{self._EUROPEPMC_BASE}/{pmcid}/fullTextXML",
                     timeout=20.0,
                 )
                 if ft_resp.status_code == 200:
@@ -159,7 +194,7 @@ class DOIResolverChannel(Channel):
     def _find_oa_url(self, doi: str, config: Config) -> str | None:
         """Use Unpaywall API to find an open-access URL."""
         email = config.get("openalex_email", "social-dive@example.com")
-        resp = httpx.get(
+        resp = get_client(config).get(
             f"https://api.unpaywall.org/v2/{quote(doi, safe='/')}",
             params={"email": email},
             timeout=10.0,
