@@ -75,8 +75,14 @@ disallow_untyped_defs = true
 # Third-party libs that ship no py.typed marker / stub package, and the
 # Rust extension (built by maturin, not present in a type-check-only env).
 [[tool.mypy.overrides]]
+# follow_imports = "skip" (not just ignore_missing_imports) because Bio.*
+# transitively pulls in numpy, whose bundled stubs use Python 3.12-only
+# syntax (PEP 695 `type` statements) — with python_version pinned to 3.10
+# above, mypy would otherwise crash trying to parse numpy's own .pyi files
+# rather than just trusting Bio's public surface as Any.
 module = ["arxiv", "feedparser", "Bio.*", "mcp.*", "anthropic", "social_dive._core"]
 ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.ruff]
 target-version = "py310"
