@@ -80,7 +80,7 @@ disallow_untyped_defs = true
 # syntax (PEP 695 `type` statements) — with python_version pinned to 3.10
 # above, mypy would otherwise crash trying to parse numpy's own .pyi files
 # rather than just trusting Bio's public surface as Any.
-module = ["arxiv", "feedparser", "Bio.*", "mcp.*", "anthropic", "social_dive._core"]
+module = ["arxiv", "feedparser", "Bio", "Bio.*", "mcp", "mcp.*", "anthropic", "social_dive._core"]
 ignore_missing_imports = true
 follow_imports = "skip"
 
