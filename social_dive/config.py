@@ -33,7 +33,7 @@ CONFIG_KEYS: list[str] = [
     "nvidia_api_key",
     "openai_api_key",
     "anthropic_api_key",
-    # Channel-specific
+    # Channel-specific (research/dev)
     "github_token",
     "ncbi_api_key",
     "ncbi_email",
@@ -41,9 +41,18 @@ CONFIG_KEYS: list[str] = [
     "openalex_api_key",
     "stackexchange_key",
     "semantic_scholar_api_key",
+    "exa_api_key",
+    # Social / login-gated (cookies are session credentials — use throwaway
+    # accounts; stored only in the 0600 config, never transmitted).
+    "twitter_cookie",
+    "reddit_cookie",
+    "xiaohongshu_cookie",
+    "bilibili_cookie",
+    "xueqiu_cookie",
     # General
     "cache_dir",
     "log_level",
+    "http_proxy",
 ]
 
 # Default values for keys that have sensible defaults
