@@ -30,6 +30,34 @@ from social_dive.channels import (
     StatusLevel,
 )
 from social_dive.config import Config
+from social_dive.probe import probe_command
+
+
+def cli_backend_probe(
+    binary: str, probe_args: list[str] | None = None, label: str | None = None
+) -> tuple[StatusLevel, str] | None:
+    """Probe a platform CLI. None = not installed; OK if it runs; WARN otherwise."""
+    result = probe_command(binary, [binary, *(probe_args or ["--version"])])
+    if not result.ok and "not found" in (result.error or "").lower():
+        return None
+    name = label or binary
+    if result.ok:
+        return StatusLevel.OK, f"{name} available"
+    return StatusLevel.WARN, f"{name} installed but not ready: {result.error}"
+
+
+def opencli_backend_probe() -> tuple[StatusLevel, str] | None:
+    """Map OpenCLI's probed state to a (level, message). None = not installed."""
+    from social_dive.backends import opencli_status
+
+    st = opencli_status()
+    if not st.installed:
+        return None
+    if st.broken:
+        return StatusLevel.ERROR, st.hint or "OpenCLI is installed but broken."
+    if st.ready:
+        return StatusLevel.OK, "OpenCLI ready (reuses your logged-in browser session)"
+    return StatusLevel.WARN, st.hint or "OpenCLI installed — connect the Chrome extension."
 
 
 def run_cli(argv: list[str], timeout: float = 60.0) -> tuple[int, str, str]:
