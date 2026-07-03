@@ -40,6 +40,21 @@ def _install_client(monkeypatch, routes: dict[str, httpx.Response], tmp_path):
     return client
 
 
+@pytest.fixture(autouse=True)
+def no_rust_backend(monkeypatch):
+    """Exercise the Python backend chain deterministically.
+
+    These tests target the jina / llms-txt / httpx selection and the
+    robots/llms logic. Whether the Rust `rust-parser` backend is available
+    depends on the build (present in CI, absent in a pure-Python checkout), so
+    exclude it here to keep behavior deterministic — the Rust path itself is
+    covered by tests/test_rust_core.py.
+    """
+    monkeypatch.setattr(
+        WebChannel, "backends", ["jina-reader", "llms-txt", "httpx-fallback"]
+    )
+
+
 @pytest.fixture
 def cfg(tmp_path):
     return Config(config_dir=tmp_path / ".sd")

@@ -13,6 +13,12 @@ All notable changes to Social Dive are documented here. This project adheres to
   *runs* (`html_to_markdown`, `parallel_fetch`), not just that it compiles.
 
 ### Fixed
+- **Robots `Disallow` flag was backend-dependent** — the classic-`Disallow`
+  metadata flag was only set by the `httpx-fallback` web backend, so it was
+  silently lost whenever another backend (jina, rust-parser, llms.txt) served
+  the page. Robots signals are now read once in `read()` and applied to
+  whichever backend serves. (Surfaced once the Rust `rust-parser` backend
+  actually started loading — see below.)
 - **Rust core was never importable** — the `#[pymodule]` function was named
   `_social_dive_core`, exporting `PyInit__social_dive_core`, but maturin builds
   the module as `social_dive._core` (needing `PyInit__core`). So

@@ -47,9 +47,15 @@ class WebChannel(Channel):
         return bool(re.match(r"https?://", url, re.IGNORECASE))
 
     def read(self, url: str, config: Config) -> Content:
-        """Read a web page and return clean Markdown content."""
-        # Respect an explicit AI opt-out before making the page request.
-        if self._ai_input_disallowed(url, config):
+        """Read a web page and return clean Markdown content.
+
+        Robots signals are read once up front and applied regardless of which
+        backend ends up serving the page: an explicit ``ai-input=no`` opt-out
+        short-circuits before any page fetch, and a classic ``Disallow`` match
+        is flagged on the returned content (not blocked).
+        """
+        signals = self._robots_signals(url, config)
+        if signals.get("ai_input") == "no" and not self._ai_signals_ignored(config):
             logger.warning(f"Site opted out of AI input via robots.txt: {url}")
             return Content(
                 url=url,
@@ -67,17 +73,26 @@ class WebChannel(Channel):
             "llms-txt": self._read_llms_txt,
             "httpx-fallback": self._read_httpx,
         }
+        content: Content | None = None
         for backend in self.ordered_backends(config):
             handler = handlers.get(backend)
             if handler is None:
                 continue
             try:
-                return handler(url, config)
+                content = handler(url, config)
+                break
             except Exception as e:  # noqa: BLE001 — try the next backend
                 logger.debug(f"Web backend '{backend}' failed for {url}: {e}")
                 continue
 
-        raise RuntimeError(f"All web backends failed for {url}")
+        if content is None:
+            raise RuntimeError(f"All web backends failed for {url}")
+
+        # Flag (don't block) a classic Disallow match — applies to whichever
+        # backend served the content, not just the httpx fallback.
+        if signals.get("path_disallowed"):
+            content.metadata["robots_path_disallowed"] = True
+        return content
 
     def search(self, query: str, config: Config, limit: int = 10) -> list[SearchResult]:
         """The web channel is a reader, not a search engine."""
@@ -156,15 +171,13 @@ class WebChannel(Channel):
         title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
 
-        content = Content(
+        return Content(
             title=title,
             body=text,
             url=url,
             source_channel=self.name,
             backend="httpx-fallback",
         )
-        self._flag_classic_disallow(content, url, config)
-        return content
 
     # -- helpers --
 
@@ -182,17 +195,9 @@ class WebChannel(Channel):
             backend=backend,
         )
 
-    def _ai_input_disallowed(self, url: str, config: Config) -> bool:
-        """True if the site's robots.txt signals ai-input=no (and not overridden)."""
-        if str(config.get("web_ignore_ai_signals", "")).lower() in ("1", "true", "yes"):
-            return False
-        signals = self._robots_signals(url, config)
-        return signals.get("ai_input") == "no"
-
-    def _flag_classic_disallow(self, content: Content, url: str, config: Config) -> None:
-        signals = self._robots_signals(url, config)
-        if signals.get("path_disallowed"):
-            content.metadata["robots_path_disallowed"] = True
+    def _ai_signals_ignored(self, config: Config) -> bool:
+        """True if the user opted out of respecting robots AI signals."""
+        return str(config.get("web_ignore_ai_signals", "")).lower() in ("1", "true", "yes")
 
     def _robots_signals(self, url: str, config: Config) -> dict[str, object]:
         """Parse robots.txt for the Cloudflare ai-input signal and path rules.
