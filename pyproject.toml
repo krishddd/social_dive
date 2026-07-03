@@ -84,7 +84,8 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
     "arxiv", "feedparser", "Bio", "Bio.*", "mcp", "mcp.*", "anthropic",
-    "diskcache", "diskcache.*", "social_dive._core",
+    "diskcache", "diskcache.*", "rookiepy", "browser_cookie3",
+    "social_dive._core",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
