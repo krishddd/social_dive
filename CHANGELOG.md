@@ -6,6 +6,20 @@ All notable changes to Social Dive are documented here. This project adheres to
 ## [Unreleased]
 
 ### Added
+- **Social / login-gated channels (opt-in)** — 11 platform connectors matching
+  the reference project: Twitter/X, Reddit, Facebook, Instagram, LinkedIn,
+  Bilibili, Xiaohongshu, Xueqiu, Xiaoyuzhou, plus V2EX (public API) and Exa
+  neural search. They route to an external backend (OpenCLI browser-session
+  reuse, or platform CLIs + cookies) and degrade to a structured
+  `unauthenticated` result with setup guidance until configured — never
+  accessing anything on their own. Supporting infra: `env.detect_environment()`,
+  `backends/opencli.py`, `cookie_extract.py`, and the `CliRoutingChannel` base.
+  Social config keys + `exa_api_key` + `http_proxy` added.
+  **ToS/ban risk** is surfaced throughout — use throwaway accounts, low volume.
+- **`configure --from-browser <browser>`** — imports platform cookies from a
+  local browser into the 0600 config (masked in `configure --list`).
+
+### Added (earlier)
 - **`check-update`** command — compares the installed version against the
   latest on PyPI and reports whether an upgrade is available (graceful when the
   package isn't published). Parity with the reference project.
