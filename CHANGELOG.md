@@ -3,6 +3,21 @@
 All notable changes to Social Dive are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`check-update`** command — compares the installed version against the
+  latest on PyPI and reports whether an upgrade is available (graceful when the
+  package isn't published). Parity with the reference project.
+- Rust core runtime smoke tests — CI now proves `_social_dive_core` actually
+  *runs* (`html_to_markdown`, `parallel_fetch`), not just that it compiles.
+
+### Fixed
+- **Windows console crash** — `social-dive version` / `doctor` raised
+  `UnicodeEncodeError` on the default Windows console (cp1252) because of the
+  🤿 emoji in `rich` output. Stdout/stderr are now forced to UTF-8 at startup.
+  (CI missed this because GitHub's Windows runner uses UTF-8 I/O.)
+
 ## [0.2.0]
 
 A research-grounded reliability and infrastructure upgrade across five phases.
