@@ -13,6 +13,12 @@ All notable changes to Social Dive are documented here. This project adheres to
   *runs* (`html_to_markdown`, `parallel_fetch`), not just that it compiles.
 
 ### Fixed
+- **Rust core was never importable** — the `#[pymodule]` function was named
+  `_social_dive_core`, exporting `PyInit__social_dive_core`, but maturin builds
+  the module as `social_dive._core` (needing `PyInit__core`). So
+  `import social_dive._core` always failed and the Rust HTML→Markdown / parallel
+  fetch paths silently fell back to Python. Renamed the module init to `_core`;
+  the new runtime tests now guard it.
 - **Windows console crash** — `social-dive version` / `doctor` raised
   `UnicodeEncodeError` on the default Windows console (cp1252) because of the
   🤿 emoji in `rich` output. Stdout/stderr are now forced to UTF-8 at startup.

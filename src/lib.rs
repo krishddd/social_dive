@@ -314,8 +314,13 @@ fn parallel_fetch(
 // ---------------------------------------------------------------------------
 
 /// Social Dive Rust core — high-performance HTML parsing and concurrent I/O.
+///
+/// The function name MUST be `_core` to match maturin's
+/// `module-name = "social_dive._core"`: PyO3 generates the module init symbol
+/// as `PyInit_<fn_name>`, and `import social_dive._core` looks for
+/// `PyInit__core`. A mismatched name here builds fine but fails at import.
 #[pymodule]
-fn _social_dive_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(html_to_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(parallel_fetch, m)?)?;
     m.add_class::<FetchResult>()?;
