@@ -136,6 +136,33 @@ Code, Cursor, …) can auto-approve and parallelize them.
 | `rss` | RSS/Atom feeds | Zero Config |
 | `doi_resolver` | DOI → full text | Zero Config |
 | `web` | Catch-all web reader | Zero Config |
+| `v2ex` | Chinese dev forum | Zero Config |
+| `exa_search` | Neural web search | Needs Key |
+
+### Social / login-gated channels (opt-in)
+
+These read login-gated platforms by routing to an external backend — **OpenCLI**
+(reuses your already-logged-in Chrome session) or platform CLIs + cookies. There
+is no zero-config path for any of them.
+
+| Channel | Access | Search |
+|---------|--------|--------|
+| `twitter` | twitter-cli / OpenCLI | ✅ |
+| `reddit` | OpenCLI / rdt-cli | ✅ |
+| `facebook` `instagram` `linkedin` | OpenCLI | ❌ |
+| `bilibili` | bili-cli / OpenCLI | ✅ |
+| `xiaohongshu` | OpenCLI / xhs-cli | ✅ |
+| `xueqiu` `xiaoyuzhou` | OpenCLI | ❌ |
+
+Setup: run `social-dive doctor` to see which backend is live per platform, then
+`social-dive configure --from-browser chrome` to import cookies for cookie-based
+platforms.
+
+> ⚠️ **ToS / ban risk.** Automated access violates these platforms' terms and
+> can get accounts banned (LinkedIn and the Chinese platforms are especially
+> aggressive). **Use throwaway accounts, keep volume low.** These channels never
+> access anything on their own — they only run when you invoke `read`/`search`,
+> and report a structured "needs setup" result until a backend is configured.
 
 ## License
 

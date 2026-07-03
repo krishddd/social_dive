@@ -91,6 +91,11 @@ def _build_parser() -> argparse.ArgumentParser:
     cfg.add_argument("value", nargs="?", help="Config value")
     cfg.add_argument("--list", action="store_true", help="List all config values")
     cfg.add_argument("--delete", action="store_true", help="Delete a config key")
+    cfg.add_argument(
+        "--from-browser",
+        metavar="BROWSER",
+        help="Import social cookies from a local browser (chrome/firefox/edge/brave/opera)",
+    )
 
     # -- read ---
     read = sub.add_parser("read", help="Read content from one or more URLs")
@@ -199,6 +204,10 @@ def _cmd_doctor(args: argparse.Namespace) -> None:
 def _cmd_configure(args: argparse.Namespace) -> None:
     config = Config()
 
+    if args.from_browser:
+        _import_cookies(config, args.from_browser)
+        return
+
     if args.list or (args.key is None and not args.delete):
         # List all config
         all_cfg = config.all()
@@ -208,9 +217,9 @@ def _cmd_configure(args: argparse.Namespace) -> None:
             )
             return
         for k, v in sorted(all_cfg.items()):
-            # Mask sensitive values
-            display_v = v
-            if "key" in k.lower() or "token" in k.lower():
+            # Mask sensitive values (keys, tokens, cookies)
+            display_v: object = v
+            if any(s in k.lower() for s in ("key", "token", "cookie")):
                 display_v = str(v)[:8] + "..." if len(str(v)) > 8 else v
             console.print(f"  [cyan]{k}[/cyan] = {display_v}")
         return
@@ -234,6 +243,37 @@ def _cmd_configure(args: argparse.Namespace) -> None:
             console.print(f"  [cyan]{args.key}[/cyan] = {val}")
         else:
             console.print(f"  [dim]{args.key} is not set[/dim]")
+
+
+def _import_cookies(config: Config, browser: str) -> None:
+    """Import social-platform cookies from a local browser into the 0600 config."""
+    try:
+        from social_dive.cookie_extract import extract_all
+
+        found = extract_all(browser)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        return
+    except RuntimeError as e:
+        console.print(f"[yellow]{e}[/yellow]")
+        return
+    except Exception as e:  # noqa: BLE001 — browser access can fail many ways
+        console.print(f"[yellow]Could not read cookies from {browser}: {e}[/yellow]")
+        return
+
+    if not found:
+        console.print(
+            f"[dim]No known-platform cookies found in {browser}. "
+            "Log into the platform in that browser first.[/dim]"
+        )
+        return
+
+    for key, value in found.items():
+        config.set(key, value)
+        console.print(f"  [green]Imported {key}[/green]")
+    console.print(
+        "[dim]Reminder: cookies are session credentials — prefer a throwaway account.[/dim]"
+    )
 
 
 def _cmd_read(args: argparse.Namespace) -> None:
@@ -420,10 +460,28 @@ def _missing_channel_deps(channels: list[str] | None) -> list[tuple[str, str]]:
     return missing
 
 
+_SOCIAL_CHANNELS = {
+    "twitter", "reddit", "facebook", "instagram", "linkedin",
+    "bilibili", "xiaohongshu", "xueqiu", "xiaoyuzhou",
+}
+
+
 def _cmd_install(args: argparse.Namespace) -> None:
     dry_run: bool = args.dry_run
     safe: bool = args.safe
     channels = args.channels.split(",") if args.channels else None
+
+    # Social channels route to external tools that aren't pip-installable
+    # (OpenCLI via npm, platform CLIs via pipx), so point the user at the setup
+    # path instead of trying to `pip install` them.
+    if channels and _SOCIAL_CHANNELS.intersection(channels):
+        console.print(
+            "[yellow]Note:[/yellow] social channels need external tools (OpenCLI via "
+            "npm, or platform CLIs via pipx) and a logged-in session. Run "
+            "[cyan]social-dive doctor[/cyan] for per-channel setup, and "
+            "[cyan]social-dive configure --from-browser chrome[/cyan] to import cookies. "
+            "Use a throwaway account."
+        )
 
     missing = _missing_channel_deps(channels)
     if not missing:

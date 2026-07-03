@@ -22,8 +22,15 @@ Use Social Dive when the user asks you to:
 - Research a topic across academic papers, code, or web sources
 - Read content from a URL (paper, repo, article, video transcript, etc.)
 - Search for papers, code, articles, or Q&A on a topic
+- Read social/platform content (Twitter/X, Reddit, Bilibili, Xiaohongshu,
+  Instagram, LinkedIn, Facebook, Xueqiu, Xiaoyuzhou, V2EX)
 - Summarize content from any supported source
 - Check which knowledge sources are currently available
+
+Social channels are login-gated: `doctor` shows whether a backend (OpenCLI or a
+platform CLI/cookies) is set up. If a social read returns `error_code:
+unauthenticated`, tell the user to run `social-dive doctor` and
+`social-dive configure --from-browser chrome` — and to use a throwaway account.
 
 ## How to use
 

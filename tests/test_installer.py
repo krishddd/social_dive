@@ -116,6 +116,25 @@ class TestUninstallCommand:
         assert home["config_file"].exists()
 
 
+class TestConfigureFromBrowser:
+    def test_imports_cookies_into_config(self, tmp_path, monkeypatch):
+        config_dir = tmp_path / ".social-dive"
+        monkeypatch.setattr(cli, "Config", lambda: Config(config_dir=config_dir))
+        monkeypatch.setattr(
+            "social_dive.cookie_extract.extract_all",
+            lambda browser: {"twitter_cookie": {"auth_token": "AAA", "ct0": "BBB"}},
+        )
+        main(["configure", "--from-browser", "chrome"])
+        assert Config(config_dir=config_dir).get("twitter_cookie") == {
+            "auth_token": "AAA", "ct0": "BBB"
+        }
+
+    def test_unsupported_browser_is_graceful(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "Config", lambda: Config(config_dir=tmp_path / ".sd"))
+        main(["configure", "--from-browser", "netscape"])
+        assert "unsupported browser" in capsys.readouterr().out.lower()
+
+
 class TestMissingDeps:
     def test_present_dep_not_flagged(self, monkeypatch):
         monkeypatch.setattr(
