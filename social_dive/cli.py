@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -36,6 +37,27 @@ if TYPE_CHECKING:
     from social_dive.channels import Content
     from social_dive.core import SocialDive
 
+
+def _force_utf8_stdio() -> None:
+    """Force stdout/stderr to UTF-8 so rich output can't crash the CLI.
+
+    The default Windows console uses a legacy code page (e.g. cp1252) that
+    can't encode the emoji/box-drawing characters in our `rich` output, so a
+    bare `social-dive version` would raise UnicodeEncodeError. Reconfiguring to
+    UTF-8 with errors="replace" makes output robust everywhere; it's a no-op on
+    platforms that are already UTF-8. Runs before the module-level Console is
+    created so the Console binds to the reconfigured streams.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):  # detached/closed stream — ignore
+                pass
+
+
+_force_utf8_stdio()
 console = Console()
 
 
@@ -55,6 +77,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # -- version ---
     sub.add_parser("version", help="Show version")
+
+    # -- check-update ---
+    sub.add_parser("check-update", help="Check whether a newer version is available")
 
     # -- doctor ---
     doc = sub.add_parser("doctor", help="Health-check all channels")
@@ -117,6 +142,46 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _cmd_version(args: argparse.Namespace) -> None:
     console.print(f"🤿 Social Dive v{__version__}")
+
+
+def _version_tuple(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in re.findall(r"\d+", v)[:3])
+
+
+def _cmd_check_update(args: argparse.Namespace) -> None:
+    """Compare the installed version against the latest published on PyPI."""
+    from social_dive.http_client import get_client
+
+    try:
+        resp = get_client().get(
+            "https://pypi.org/pypi/social-dive/json", timeout=10.0, use_cache=False
+        )
+    except Exception as e:  # noqa: BLE001 — network is best-effort
+        console.print(f"[yellow]Could not check for updates: {e}[/yellow]")
+        return
+
+    if resp.status_code == 404:
+        console.print(
+            f"[dim]social-dive {__version__} — not published to PyPI yet, "
+            "so there's no newer release to compare against.[/dim]"
+        )
+        return
+    if resp.status_code != 200:
+        console.print(f"[yellow]Update check failed: HTTP {resp.status_code}[/yellow]")
+        return
+
+    latest = resp.json().get("info", {}).get("version", "")
+    if not latest:
+        console.print("[yellow]Could not determine the latest version.[/yellow]")
+        return
+
+    if _version_tuple(__version__) >= _version_tuple(latest):
+        console.print(f"[green]social-dive {__version__} is up to date (latest: {latest}).[/green]")
+    else:
+        console.print(
+            f"[yellow]Update available: {__version__} → {latest}. "
+            "Upgrade with:  pip install -U social-dive[/yellow]"
+        )
 
 
 def _cmd_doctor(args: argparse.Namespace) -> None:
@@ -432,6 +497,7 @@ def _cmd_skill(args: argparse.Namespace) -> None:
 
 _COMMANDS = {
     "version": _cmd_version,
+    "check-update": _cmd_check_update,
     "doctor": _cmd_doctor,
     "configure": _cmd_configure,
     "read": _cmd_read,

@@ -3,6 +3,33 @@
 All notable changes to Social Dive are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`check-update`** command — compares the installed version against the
+  latest on PyPI and reports whether an upgrade is available (graceful when the
+  package isn't published). Parity with the reference project.
+- Rust core runtime smoke tests — CI now proves `_social_dive_core` actually
+  *runs* (`html_to_markdown`, `parallel_fetch`), not just that it compiles.
+
+### Fixed
+- **Robots `Disallow` flag was backend-dependent** — the classic-`Disallow`
+  metadata flag was only set by the `httpx-fallback` web backend, so it was
+  silently lost whenever another backend (jina, rust-parser, llms.txt) served
+  the page. Robots signals are now read once in `read()` and applied to
+  whichever backend serves. (Surfaced once the Rust `rust-parser` backend
+  actually started loading — see below.)
+- **Rust core was never importable** — the `#[pymodule]` function was named
+  `_social_dive_core`, exporting `PyInit__social_dive_core`, but maturin builds
+  the module as `social_dive._core` (needing `PyInit__core`). So
+  `import social_dive._core` always failed and the Rust HTML→Markdown / parallel
+  fetch paths silently fell back to Python. Renamed the module init to `_core`;
+  the new runtime tests now guard it.
+- **Windows console crash** — `social-dive version` / `doctor` raised
+  `UnicodeEncodeError` on the default Windows console (cp1252) because of the
+  🤿 emoji in `rich` output. Stdout/stderr are now forced to UTF-8 at startup.
+  (CI missed this because GitHub's Windows runner uses UTF-8 I/O.)
+
 ## [0.2.0]
 
 A research-grounded reliability and infrastructure upgrade across five phases.

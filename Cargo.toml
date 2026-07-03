@@ -5,8 +5,10 @@ edition = "2021"
 description = "Rust performance core for Social Dive — HTML→Markdown parser and concurrent HTTP fetcher"
 license = "MIT"
 
+# Lib name matches the Python module (maturin module-name = "social_dive._core")
+# so the generated PyInit__core symbol resolves on `import social_dive._core`.
 [lib]
-name = "_social_dive_core"
+name = "_core"
 crate-type = ["cdylib"]
 
 [dependencies]
