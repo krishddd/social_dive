@@ -174,6 +174,25 @@ class TestRetryAfter:
         assert HTTPClient._retry_after_seconds(resp) is None
 
 
+class TestProxy:
+    def test_reads_http_proxy_from_config(self, tmp_path):
+        from social_dive.config import Config
+
+        cfg = Config(config_dir=tmp_path / ".sd")
+        cfg.set("http_proxy", "http://127.0.0.1:8888")
+        # Construction must succeed and pick up the proxy (no transport given).
+        client = HTTPClient(config=cfg, rate_limit=False, cache=False)
+        assert client._client._mounts  # httpx records the proxy as a transport mount
+        client.close()
+
+    def test_no_proxy_by_default(self, tmp_path):
+        from social_dive.config import Config
+
+        client = HTTPClient(config=Config(config_dir=tmp_path / ".sd"), cache=False)
+        assert not client._client._mounts
+        client.close()
+
+
 class TestTokenBucket:
     def test_burst_capacity_is_immediate(self):
         tb = TokenBucket(rate=1000.0, capacity=3)

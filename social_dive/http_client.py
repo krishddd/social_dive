@@ -87,13 +87,23 @@ class HTTPClient:
         cache: bool = True,
         timeout: float = _DEFAULT_TIMEOUT,
         transport: httpx.BaseTransport | None = None,
+        proxy: str | None = None,
     ) -> None:
-        self._client = httpx.Client(
-            timeout=timeout,
-            follow_redirects=True,
-            headers={"User-Agent": _USER_AGENT},
-            transport=transport,
-        )
+        # Honor an explicit proxy arg, else the `http_proxy` config key. A
+        # transport (used in tests) and a proxy are mutually exclusive in httpx,
+        # so the injected transport always wins.
+        if proxy is None and config is not None:
+            proxy = config.get("http_proxy")
+        client_kwargs: dict[str, Any] = {
+            "timeout": timeout,
+            "follow_redirects": True,
+            "headers": {"User-Agent": _USER_AGENT},
+        }
+        if transport is not None:
+            client_kwargs["transport"] = transport
+        elif proxy:
+            client_kwargs["proxy"] = proxy
+        self._client = httpx.Client(**client_kwargs)
         self._timeout = timeout
         self._rate = rate
         self._burst = burst

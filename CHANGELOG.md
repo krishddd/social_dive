@@ -19,6 +19,11 @@ All notable changes to Social Dive are documented here. This project adheres to
 - **`configure --from-browser <browser>`** — imports platform cookies from a
   local browser into the 0600 config (masked in `configure --list`).
 
+### Fixed (social follow-up)
+- **`http_proxy` config key was never wired** — it's now read by the shared
+  HTTP client and applied to every API-channel request (like `cache_dir` was in
+  0.2.0). A test-injected transport still takes precedence over a proxy.
+
 ### Added (earlier)
 - **`check-update`** command — compares the installed version against the
   latest on PyPI and reports whether an upgrade is available (graceful when the
